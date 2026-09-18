@@ -5,7 +5,7 @@
     <div class="card-box">
       <div class="card-title">
         监测单元列表
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" style="margin-left: auto;" @click="openAddTankDialog">添加水槽</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openAddTankDialog"><svg-icon name="plus" :size="14"/>添加水槽</el-button>
       </div>
       <div class="tank-list">
         <div
@@ -39,12 +39,50 @@
       </span>
     </el-dialog>
 
+    <!-- 1.5 预计时间/温度（目标温度 ↔ 预计时长 双向推算） -->
+    <div class="card-box">
+      <div class="card-title">
+        预计时间 / 温度
+        <el-select v-model="predictField" size="mini" style="width: 110px; margin-left: 12px;" @change="onPredictFieldChange">
+          <el-option v-for="s in temperatureFields" :key="s.key" :label="s.label" :value="s.key"></el-option>
+        </el-select>
+      </div>
+      <div class="predict-row">
+        <span class="predict-label">当前温度</span>
+        <span class="predict-current">{{ predictCurrentText }}</span>
+        <span class="predict-rate">
+          变化速率
+          <el-input-number v-model="predictRateInput" size="mini" :step="0.1" :precision="2" :controls="false" placeholder="自动" style="width: 72px;"></el-input-number>
+          ℃/分
+        </span>
+      </div>
+      <div class="predict-hint" v-if="!isManualRate">自动速率：{{ predictRateText }}（近 15 分钟加权推算，可手动填写）</div>
+      <div class="predict-grid">
+        <div class="predict-item">
+          <div class="predict-item-label">填目标温度 → 预计时间</div>
+          <div class="predict-input-row">
+            <el-input-number v-model="predictTarget" size="small" :step="1" :precision="1" :controls="false" placeholder="目标温度" style="flex: 1;"></el-input-number>
+            <span class="predict-unit">℃</span>
+          </div>
+          <div class="predict-result">{{ predictTimeText }}</div>
+        </div>
+        <div class="predict-item">
+          <div class="predict-item-label">填分钟数 → 预计温度</div>
+          <div class="predict-input-row">
+            <el-input-number v-model="predictMinutes" size="small" :step="1" :precision="0" :controls="false" placeholder="分钟数" style="flex: 1;"></el-input-number>
+            <span class="predict-unit">分钟</span>
+          </div>
+          <div class="predict-result">{{ predictTempText }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. 实时传感器数据 -->
     <div class="card-box">
       <div class="card-title">
         实时传感数据
         <span class="time">{{ sensorData.timestamp }}</span>
-        <el-button size="mini" type="primary" plain icon="el-icon-edit" style="margin-left: 10px;" @click="openSensorEdit">编辑</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: 10px;" @click="openSensorEdit"><svg-icon name="edit" :size="14"/>编辑</el-button>
       </div>
       <!-- 桌面端：网格 -->
       <div class="desktop-only">
@@ -78,7 +116,7 @@
             <el-radio-button label="manual">手动</el-radio-button>
           </el-radio-group>
         </span>
-        <el-button size="mini" type="primary" plain icon="el-icon-edit" style="margin-left: auto;" @click="openDeviceEdit">编辑</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openDeviceEdit"><svg-icon name="edit" :size="14"/>编辑</el-button>
       </div>
       <div class="mode-hint" :class="!online ? 'mode-hint-offline' : ''">
         <span class="hint-dot" :class="online ? 'dot-online' : 'dot-offline'"></span>
@@ -132,7 +170,7 @@
         </div>
       </div>
       <div class="undo-row">
-        <el-button size="mini" plain type="warning" icon="el-icon-refresh-left" @click="undoLastControl">撤销上次手动控制</el-button>
+        <el-button size="mini" plain type="warning" @click="undoLastControl"><svg-icon name="undo" :size="14"/>撤销上次手动控制</el-button>
       </div>
     </div>
 
@@ -164,11 +202,11 @@
           <el-input v-model="item.key" size="mini" placeholder="字段(如 temp1)" style="width: 80px;"></el-input>
           <el-input v-model="item.label" size="mini" placeholder="名称" style="flex: 1; min-width: 80px;"></el-input>
           <el-input v-model="item.unit" size="mini" placeholder="单位" style="width: 70px;"></el-input>
-          <el-button size="mini" type="danger" plain icon="el-icon-delete" @click="removeSensorItem(index)"></el-button>
+          <el-button size="mini" type="danger" plain @click="removeSensorItem(index)"><svg-icon name="delete" :size="14"/></el-button>
         </div>
       </div>
       <div style="margin-top: 10px;">
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" @click="addSensorItem">添加一项</el-button>
+        <el-button size="mini" type="primary" plain @click="addSensorItem"><svg-icon name="plus" :size="14"/>添加一项</el-button>
       </div>
       <span slot="footer">
         <el-button size="mini" @click="sensorEditVisible = false">取消</el-button>
@@ -182,11 +220,11 @@
         <div class="sensor-edit-row" v-for="(d, index) in editDevices" :key="index">
           <el-input v-model="d.key" size="mini" placeholder="字段(如 pump)" style="width: 90px;"></el-input>
           <el-input v-model="d.label" size="mini" placeholder="名称" style="flex: 1; min-width: 80px;"></el-input>
-          <el-button size="mini" type="danger" plain icon="el-icon-delete" @click="removeDevice(index)"></el-button>
+          <el-button size="mini" type="danger" plain @click="removeDevice(index)"><svg-icon name="delete" :size="14"/></el-button>
         </div>
       </div>
       <div style="margin-top: 10px;">
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" @click="addDevice">添加设备</el-button>
+        <el-button size="mini" type="primary" plain @click="addDevice"><svg-icon name="plus" :size="14"/>添加设备</el-button>
       </div>
       <span slot="footer">
         <el-button size="mini" @click="deviceEditVisible = false">取消</el-button>
@@ -198,7 +236,7 @@
     <div class="card-box">
       <div class="card-title">
         定时任务
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" style="margin-left: auto;" @click="openScheduleAdd">添加任务</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openScheduleAdd"><svg-icon name="plus" :size="14"/>添加任务</el-button>
       </div>
       <!-- 桌面端：表格 -->
       <div class="desktop-only" v-if="schedules.length">
@@ -282,14 +320,14 @@
       </div>
       <div class="rule-section-title" style="margin-top: 12px;">开关时间列表</div>
       <div v-for="(act, idx) in editSchedule.actions" :key="idx" class="schedule-action-row">
-        <el-time-picker v-model="act.time" size="mini" format="HH:mm" value-format="HH:mm" placeholder="时间" style="flex: 1; min-width: 120px;"></el-time-picker>
+        <el-time-picker v-model="act.time" size="mini" format="HH:mm:ss" value-format="HH:mm:ss" placeholder="时间" style="flex: 1; min-width: 120px;"></el-time-picker>
         <el-radio-group v-model="act.action" size="mini">
           <el-radio-button :label="1">开启</el-radio-button>
           <el-radio-button :label="0">关闭</el-radio-button>
         </el-radio-group>
-        <el-button size="mini" type="danger" plain icon="el-icon-delete" @click="editSchedule.actions.splice(idx, 1)"></el-button>
+        <el-button size="mini" type="danger" plain @click="editSchedule.actions.splice(idx, 1)"><svg-icon name="delete" :size="14"/></el-button>
       </div>
-      <el-button size="mini" type="primary" plain icon="el-icon-plus" @click="editSchedule.actions.push({ time: '', action: 1 })">添加时间点</el-button>
+      <el-button size="mini" type="primary" plain @click="editSchedule.actions.push({ time: '', action: 1 })"><svg-icon name="plus" :size="14"/>添加时间点</el-button>
       <span slot="footer">
         <el-button size="mini" @click="scheduleEditVisible = false">取消</el-button>
         <el-button size="mini" type="primary" @click="saveSchedule">确定</el-button>
@@ -356,8 +394,17 @@ export default {
       // ===== 定时任务 =====
       schedules: [], // 本地持久化的定时任务列表
       scheduleEditVisible: false,
-      editSchedule: { deviceId: 'pump', actions: [{ time: '08:00', action: 1 }], repeat: 'daily' },
-      scheduleNextId: 1 // 用于生成唯一ID
+      editSchedule: { deviceId: 'pump', actions: [{ time: '08:00:00', action: 1 }], repeat: 'daily' },
+      scheduleNextId: 1, // 用于生成唯一ID
+
+      // ===== 预计时间/温度 =====
+      predictField: 'temp1', // 当前推算的温度字段
+      predictRateInput: null, // 手动填写的温度变化速率(℃/分)，null 表示用自动推算
+      predictRateAuto: null, // 近 15 分钟历史数据加权回归出的速率(℃/分)
+      predictTarget: null, // 目标温度输入
+      predictMinutes: null, // 分钟数输入
+      predictHistoryLoading: false,
+      predictTimer: null
     }
   },
   created() {
@@ -368,6 +415,10 @@ export default {
     this.loadDeletedDeviceKeys()
     this.loadControlMode()
     this.loadSchedules()
+    // 确保默认温度字段有效（用户可能已删除 temp1）
+    if (!this.temperatureFields.some(s => s.key === this.predictField)) {
+      this.predictField = this.temperatureFields.length ? this.temperatureFields[0].key : 'temp1'
+    }
   },
   mounted() {
     this.initSensorFields()
@@ -376,8 +427,11 @@ export default {
     this.pollData()
 
     this.timer = setInterval(() => this.pollData(), 3000)
-    // 每分钟检查一次定时任务
-    this.scheduleTimer = setInterval(() => this.checkSchedules(), 60000)
+    // 每秒检查一次定时任务（时间已精确到秒）
+    this.scheduleTimer = setInterval(() => this.checkSchedules(), 1000)
+    // 预计时间/温度：初始推算一次速率，之后每 60 秒刷新
+    this.fetchPredictRate()
+    this.predictTimer = setInterval(() => this.fetchPredictRate(), 60000)
     // 初始化添加水槽表单默认名
     const nextId = Math.max(0, ...this.tankList.map(t => Number(t.id))) + 1
     this.addTankForm.defaultName = '水槽 ' + String(nextId).padStart(2, '0')
@@ -388,6 +442,9 @@ export default {
     }
     if (this.scheduleTimer) {
       clearInterval(this.scheduleTimer)
+    }
+    if (this.predictTimer) {
+      clearInterval(this.predictTimer)
     }
   },
   computed: {
@@ -402,6 +459,61 @@ export default {
     isSystemNormal() {
       const s = this.judgeResult && this.judgeResult.status
       return s === 'normal' || s === undefined || s === null || s === '' || s === '--'
+    },
+    // 温度字段（单位含 ℃ 或字段名含 temp），无匹配时回退全部传感字段
+    temperatureFields() {
+      const list = this.sensorItems.filter(s => (s.unit || '').indexOf('℃') >= 0 || /temp/i.test(s.key))
+      return list.length ? list : this.sensorItems
+    },
+    // 当前温度数值（解析失败返回 null）
+    predictCurrent() {
+      const n = Number(this.sensorData[this.predictField])
+      return isNaN(n) ? null : n
+    },
+    predictCurrentText() {
+      return this.predictCurrent === null ? '--' : this.predictCurrent + ' ℃'
+    },
+    // 是否手动填写了速率（否则用自动推算）
+    isManualRate() {
+      return this.predictRateInput !== null && this.predictRateInput !== undefined && this.predictRateInput !== ''
+    },
+    // 生效的速率：手动优先，否则自动；无数据返回 null
+    predictRate() {
+      if (this.isManualRate) {
+        const n = Number(this.predictRateInput)
+        return isNaN(n) ? null : n
+      }
+      return this.predictRateAuto
+    },
+    predictRateText() {
+      const r = this.predictRate
+      if (r === null || r === undefined) return '暂无'
+      const v = parseFloat(r.toFixed(4))
+      return (v > 0 ? '+' : '') + v + ' ℃/分'
+    },
+    // 目标温度 → 预计分钟数
+    predictTimeText() {
+      if (this.predictCurrent === null) return '等待实时温度数据…'
+      const target = Number(this.predictTarget)
+      if (this.predictTarget === null || this.predictTarget === undefined || isNaN(target)) return '请输入目标温度'
+      const rate = this.predictRate
+      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
+      if (Math.abs(rate) < 1e-9) {
+        return target === this.predictCurrent ? '当前已达标' : '速率接近 0，无法估算'
+      }
+      const minutes = (target - this.predictCurrent) / rate
+      if (minutes < 0) return '按当前速率无法达到该温度'
+      return '预计 ' + this.formatPredictDuration(minutes)
+    },
+    // 分钟数 → 预计温度
+    predictTempText() {
+      if (this.predictCurrent === null) return '等待实时温度数据…'
+      const minutes = Number(this.predictMinutes)
+      if (this.predictMinutes === null || this.predictMinutes === undefined || isNaN(minutes)) return '请输入分钟数'
+      const rate = this.predictRate
+      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
+      const temp = this.predictCurrent + rate * minutes
+      return '预计 ' + temp.toFixed(1) + ' ℃'
     }
   },
   methods: {
@@ -786,13 +898,27 @@ export default {
         let res = await this.$http.get('/schedules')
         res = unwrapData(res)
         if (res && Array.isArray(res)) {
-          this.schedules = res
+          // 兼容旧数据：把 'HH:mm' 补成 'HH:mm:ss'，保证按秒匹配
+          this.schedules = res.map(s => ({
+            ...s,
+            actions: Array.isArray(s.actions)
+              ? s.actions.map(a => ({ ...a, time: this.normalizeScheduleTime(a.time) }))
+              : s.actions
+          }))
           const maxId = res.reduce((max, s) => Math.max(max, s.id || 0), 0)
           this.scheduleNextId = maxId + 1
         }
       } catch (e) {
         console.error('加载定时任务失败', e)
       }
+    },
+
+    // 把定时任务时间统一为 'HH:mm:ss'（旧数据若缺秒则补 0）
+    normalizeScheduleTime(t) {
+      if (!t) return t
+      const parts = String(t).split(':')
+      if (parts.length === 2) return t + ':00'
+      return t
     },
 
     // 保存定时任务列表（到后端 API）
@@ -808,7 +934,7 @@ export default {
 
     // 打开添加任务弹窗
     openScheduleAdd() {
-      this.editSchedule = { deviceId: 'pump', actions: [{ time: '08:00', action: 1 }], repeat: 'daily' }
+      this.editSchedule = { deviceId: 'pump', actions: [{ time: '08:00:00', action: 1 }], repeat: 'daily' }
       this.scheduleEditVisible = true
     },
 
@@ -875,7 +1001,8 @@ export default {
       const now = new Date()
       const currentHours = String(now.getHours()).padStart(2, '0')
       const currentMinutes = String(now.getMinutes()).padStart(2, '0')
-      const currentTime = `${currentHours}:${currentMinutes}`
+      const currentSeconds = String(now.getSeconds()).padStart(2, '0')
+      const currentTime = `${currentHours}:${currentMinutes}:${currentSeconds}`
       const currentDay = now.getDay() // 0=周日, 6=周六
 
       this.schedules.forEach(schedule => {
@@ -1018,6 +1145,79 @@ export default {
         alarm: '检测到异常状况，请及时查看报警并处理。'
       }
       return map[status] || '暂无判定结论。'
+    },
+
+    // ===== 预计时间/温度 =====
+    onPredictFieldChange() {
+      this.fetchPredictRate()
+    },
+    // 时间戳 → 毫秒（解析失败返回 NaN）
+    parseTime(ts) {
+      if (!ts) return NaN
+      const t = new Date(String(ts).replace(/-/g, '/')).getTime()
+      return isNaN(t) ? NaN : t
+    },
+    // 图表接口返回归一化为点数组 [{timestamp, value}]
+    normalizePoints(res) {
+      let arr = unwrapData(res)
+      if (!Array.isArray(arr) && arr && Array.isArray(arr.data)) arr = arr.data
+      return Array.isArray(arr) ? arr : []
+    },
+    // 时间 → 'YYYY-MM-DD HH:MM:SS'
+    formatDate(date) {
+      const pad = (n) => n < 10 ? '0' + n : n
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    },
+    // 时间加权线性回归斜率（℃/分）：x 为相对首点的分钟数，近期点权重更高（时间衰减 τ=5 分钟），
+    // 使速率更贴近当前变化趋势，而非整段历史平均
+    linearSlope(points) {
+      if (!points || points.length < 2) return null
+      const t0 = points[0].t
+      const tau = 5 * 60 * 1000 // 时间衰减常数 5 分钟
+      let sw = 0, swx = 0, swy = 0, swxy = 0, swx2 = 0
+      points.forEach(p => {
+        const dt = p.t - t0
+        const x = dt / 60000 // 分钟（浮点，保留秒级精度）
+        const y = p.v
+        const w = Math.exp(-dt / tau)
+        sw += w; swx += w * x; swy += w * y; swxy += w * x * y; swx2 += w * x * x
+      })
+      const denom = sw * swx2 - swx * swx
+      if (Math.abs(denom) < 1e-9) return null
+      return (sw * swxy - swx * swy) / denom
+    },
+    // 拉取近 15 分钟温度历史，加权线性回归推算变化速率(℃/分)
+    async fetchPredictRate() {
+      if (this.predictHistoryLoading) return
+      this.predictHistoryLoading = true
+      try {
+        const field = this.predictField
+        const end = new Date()
+        const start = new Date(end.getTime() - 15 * 60 * 1000)
+        const res = await this.$http.get('/records/sensor/chart', {
+          params: { sensor_type: field, start_time: this.formatDate(start), end_time: this.formatDate(end) }
+        })
+        const points = this.normalizePoints(res)
+          .map(p => ({ t: this.parseTime(p.timestamp), v: Number(p.value) }))
+          .filter(p => !isNaN(p.t) && !isNaN(p.v))
+          .sort((a, b) => a.t - b.t)
+        this.predictRateAuto = this.linearSlope(points)
+      } catch (e) {
+        this.predictRateAuto = null
+      } finally {
+        this.predictHistoryLoading = false
+      }
+    },
+    // 分钟数 → 可读时长文案（精确到秒）
+    formatPredictDuration(mins) {
+      if (!isFinite(mins)) return '--'
+      const totalSeconds = Math.round(mins * 60)
+      if (totalSeconds < 60) return totalSeconds + ' 秒'
+      const h = Math.floor(totalSeconds / 3600)
+      const m = Math.floor((totalSeconds % 3600) / 60)
+      const s = totalSeconds % 60
+      if (h > 0) return h + ' 小时 ' + m + ' 分 ' + s + ' 秒'
+      return m + ' 分 ' + s + ' 秒'
     },
 
   }
@@ -1309,6 +1509,78 @@ export default {
   flex-wrap: wrap;
 }
 
+/* 预计时间/温度 */
+.predict-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.predict-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.predict-current {
+  font-size: 20px;
+  font-weight: bold;
+  color: #14b8a6;
+}
+
+.predict-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #909399;
+  margin-left: auto;
+}
+
+.predict-hint {
+  font-size: 12px;
+  color: #909399;
+  margin: 6px 0 12px;
+}
+
+.predict-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.predict-item {
+  background: #f5f7fa;
+  border: 1px solid #f0f2f5;
+  border-radius: 12px;
+  padding: 14px 12px;
+}
+
+.predict-item-label {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.predict-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.predict-unit {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.predict-result {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #14b8a6;
+}
+
 /* ===== 响应式：手机端显示卡片，隐藏网格/表格 ===== */
 .mobile-only { display: none; }
 .desktop-only { display: block; }
@@ -1417,6 +1689,15 @@ export default {
     font-weight: 600;
   }
   .control-card .el-button {
+    width: 100%;
+  }
+
+  /* 预计时间/温度：手机端两列改单列 */
+  .predict-grid {
+    grid-template-columns: 1fr;
+  }
+  .predict-rate {
+    margin-left: 0;
     width: 100%;
   }
 

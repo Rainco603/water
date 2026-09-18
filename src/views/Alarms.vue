@@ -19,7 +19,7 @@
     <div class="card-box">
       <div class="card-title">
         报警上下限设定
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" style="margin-left: auto;" @click="openThresholdAdd">添加阈值</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openThresholdAdd"><svg-icon name="plus" :size="14"/>添加阈值</el-button>
       </div>
       <div class="threshold-list">
         <div class="threshold-row" v-for="f in thresholdFields" :key="f.field">

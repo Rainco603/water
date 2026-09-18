@@ -7,9 +7,9 @@
         <el-radio-button label="and">且</el-radio-button>
         <el-radio-button label="or">或</el-radio-button>
       </el-radio-group>
-      <el-button size="mini" type="text" icon="el-icon-plus" @click="addLeaf">条件</el-button>
-      <el-button size="mini" type="text" icon="el-icon-plus" @click="addGroup">分组</el-button>
-      <el-button v-if="removable" size="mini" type="text" style="color: #f56c6c;" icon="el-icon-delete" @click="$emit('remove')">删除分组</el-button>
+      <el-button size="mini" type="text" @click="addLeaf"><svg-icon name="plus" :size="14"/>条件</el-button>
+      <el-button size="mini" type="text" @click="addGroup"><svg-icon name="plus" :size="14"/>分组</el-button>
+      <el-button v-if="removable" size="mini" type="text" style="color: #f56c6c;" @click="$emit('remove')"><svg-icon name="delete" :size="14"/>删除分组</el-button>
     </div>
 
     <div class="cond-node" v-for="(node, i) in group.checks" :key="node._uid || i">
@@ -31,7 +31,7 @@
           <el-option v-for="op in opOptions" :key="op" :label="op" :value="op"></el-option>
         </el-select>
         <el-input v-model="node.value" size="mini" placeholder="阈值" style="width: 110px;"></el-input>
-        <el-button size="mini" type="danger" plain icon="el-icon-delete" @click="removeNode(i)"></el-button>
+        <el-button size="mini" type="danger" plain @click="removeNode(i)"><svg-icon name="delete" :size="14"/></el-button>
       </div>
     </div>
 

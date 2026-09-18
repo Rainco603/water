@@ -3,9 +3,10 @@
     <!-- 顶部标题栏 -->
     <header class="app-header">
       <div class="logo">
-        <img class="icon" src="./assets/logo.png" alt="logo">
-        IoT 水系统智能监控平台
+        <span class="logo-badge"><img class="icon" src="./assets/logo.png" alt="logo"></span>
+        <span class="logo-text">IoT 水系统智能监控平台</span>
       </div>
+      <svg-icon name="droplet" :size="20" class="header-drop"></svg-icon>
     </header>
 
     <!-- 主要内容区域 (路由出口) -->
@@ -16,23 +17,23 @@
     <!-- 底部导航栏 -->
     <footer v-if="!hideTab" class="app-footer">
       <router-link to="/" class="tab-item" active-class="active">
-        <i class="icon el-icon-s-home"></i>
+        <svg-icon name="home" :size="22"></svg-icon>
         <span class="text">主页</span>
       </router-link>
       <router-link to="/records" class="tab-item" active-class="active">
-        <i class="icon el-icon-s-data"></i>
+        <svg-icon name="record" :size="22"></svg-icon>
         <span class="text">记录</span>
       </router-link>
       <router-link to="/alarms" class="tab-item" active-class="active">
-        <i class="icon el-icon-s-order"></i>
+        <svg-icon name="alarm" :size="22"></svg-icon>
         <span class="text">报警</span>
       </router-link>
       <router-link to="/statistics" class="tab-item" active-class="active">
-        <i class="icon el-icon-data-analysis"></i>
+        <svg-icon name="statistics" :size="22"></svg-icon>
         <span class="text">统计</span>
       </router-link>
       <router-link to="/config" class="tab-item" active-class="active">
-        <i class="icon el-icon-s-tools"></i>
+        <svg-icon name="settings" :size="22"></svg-icon>
         <span class="text">配置</span>
       </router-link>
     </footer>
@@ -156,32 +157,50 @@ export default {
   background-color: #f0f2f5;
 }
 
-/* 顶部标题样式 */
+/* 顶部标题样式（青绿渐变） */
 .app-header {
-  height: 50px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ebeef5;
+  height: 56px;
+  background: var(--primary-gradient);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 16px;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.25);
 }
 
 .logo {
-  font-size: 17px;
-  font-weight: 600;
-  color: #14b8a6;
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
-.logo .icon {
+.logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.logo-badge .icon {
   width: 22px;
   height: 22px;
-  margin-right: 6px;
-  display: inline-block;
-  vertical-align: -4px;
+  display: block;
+}
+
+.logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.header-drop {
+  opacity: 0.85;
 }
 
 /* 主内容区样式 */
@@ -194,13 +213,13 @@ export default {
 
 /* 底部导航样式 */
 .app-footer {
-  height: 56px;
+  height: 60px;
   background-color: #ffffff;
   border-top: 1px solid #ebeef5;
   display: flex;
   justify-content: space-around;
   align-items: center;
   flex-shrink: 0;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
 }
 </style>

@@ -36,7 +36,7 @@
         </div>
         <div class="form-actions">
           <el-button type="primary" size="small" @click="handleQuery" round>查 询</el-button>
-          <el-button size="small" icon="el-icon-download" @click="exportCsv" round>导出 CSV</el-button>
+          <el-button size="small" @click="exportCsv" round><svg-icon name="download" :size="14"/>导出 CSV</el-button>
         </div>
       </div>
     </div>
@@ -45,12 +45,12 @@
     <div class="card-box" v-if="showSensorChart">
       <div class="card-title">
         传感器数据曲线
-        <el-button size="mini" type="text" :icon="fsActive ? 'el-icon-close' : 'el-icon-full-screen'" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)">横屏</el-button>
+        <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
       </div>
       <div class="chart-wrap" ref="chartWrap">
         <div ref="chart" style="width: 100%; height: 300px;"></div>
         <div v-if="!hasQueried" class="chart-placeholder">请设置筛选条件后点击【查 询】查看曲线</div>
-        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round icon="el-icon-close" @click.stop="toggleChartFullscreen($refs.chartWrap, chart)">退出横屏</el-button>
+        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round @click.stop="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon name="close" :size="14"/>退出横屏</el-button>
       </div>
     </div>
 
@@ -58,12 +58,12 @@
     <div class="card-box" v-if="showActuatorChart">
       <div class="card-title">
         执行器状态曲线
-        <el-button size="mini" type="text" :icon="fsActive ? 'el-icon-close' : 'el-icon-full-screen'" style="margin-left: auto;" @click="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)">横屏</el-button>
+        <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
       </div>
       <div class="chart-wrap" ref="actuatorChartWrap">
         <div ref="actuatorChart" style="width: 100%; height: 240px;"></div>
         <div v-if="!actuatorChartQueried" class="chart-placeholder">请选择筛选条件后点击【查 询】查看开关状态</div>
-        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round icon="el-icon-close" @click.stop="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)">退出横屏</el-button>
+        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round @click.stop="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)"><svg-icon name="close" :size="14"/>退出横屏</el-button>
       </div>
     </div>
 

@@ -5,7 +5,7 @@
     <div class="card-box">
       <div class="card-title">
         后端服务地址
-        <el-button size="mini" type="primary" plain icon="el-icon-refresh" style="margin-left: auto;" @click="resetApiBase">恢复默认</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="resetApiBase"><svg-icon name="refresh" :size="14"/>恢复默认</el-button>
       </div>
       <div class="config-row">
         <span class="c-label">当前地址：</span>
@@ -72,7 +72,7 @@
     <div class="card-box">
       <div class="card-title">
         安全联锁配置（温度闭环）
-        <el-button size="mini" type="primary" plain icon="el-icon-plus" style="margin-left: auto;" @click="openRuleEdit(-1)">添加规则</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openRuleEdit(-1)"><svg-icon name="plus" :size="14"/>添加规则</el-button>
         <el-button size="mini" type="primary" style="margin-left: 10px;" @click="saveRules">保存规则</el-button>
       </div>
       <!-- 桌面端：表格 -->
@@ -199,7 +199,7 @@
               <td>{{ item.action || '无' }}</td>
               <td>
                 T1:{{ item.payload && item.payload.temp1 }}℃, T2:{{ item.payload && item.payload.temp2 }}℃, P:{{ item.payload && item.payload.pressure }}, F:{{ item.payload && item.payload.flow }}
-                <i :class="expandedRows.includes(index) ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" style="margin-left: 10px;"></i>
+                <svg-icon :name="expandedRows.includes(index) ? 'arrow-up' : 'arrow-down'" :size="14" style="margin-left: 10px;"></svg-icon>
               </td>
             </tr>
             <tr v-if="expandedRows.includes(index)">
@@ -284,7 +284,7 @@
               <td>{{ item.operation_type || item.operationType || '-' }}</td>
               <td>
                 {{ opLogSummary(item) }}
-                <i :class="expandedOpLogRows.includes(index) ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" style="margin-left: 10px;"></i>
+                <svg-icon :name="expandedOpLogRows.includes(index) ? 'arrow-up' : 'arrow-down'" :size="14" style="margin-left: 10px;"></svg-icon>
               </td>
             </tr>
             <tr v-if="expandedOpLogRows.includes(index)">

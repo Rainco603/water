@@ -2,14 +2,14 @@
   <div class="tank-detail-page">
     <!-- 返回按钮 -->
     <div class="back-btn" @click="goBack">
-      <i class="el-icon-back"></i> 返回主页
+      <svg-icon name="back" :size="16"/> 返回主页
     </div>
 
     <!-- 1. 水槽基本信息与状态 -->
     <div class="card-box">
       <div class="card-title">
         水槽 0{{ tankId }} - 实时状态
-        <el-button size="mini" type="primary" plain icon="el-icon-edit" style="margin-left: 10px;" @click="openEditDialog">编辑</el-button>
+        <el-button size="mini" type="primary" plain style="margin-left: 10px;" @click="openEditDialog"><svg-icon name="edit" :size="14"/>编辑</el-button>
       </div>
 
       <!-- 桌面端：水槽可视化 + 动态卡片网格 -->
@@ -97,7 +97,7 @@
     <div class="card-box" v-if="displaySensors.length > 0">
       <div class="card-title">
         历史趋势曲线
-        <el-button size="mini" type="text" :icon="fsActive ? 'el-icon-close' : 'el-icon-full-screen'" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)">横屏</el-button>
+        <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
       </div>
       <div class="chart-filter">
         <span class="label">快捷时间:</span>
@@ -114,10 +114,10 @@
       <div class="chart-wrap" ref="chartWrap">
         <div ref="chart" style="width: 100%; height: 300px;"></div>
         <div class="chart-empty" v-if="chartEmpty">
-          <i class="el-icon-data-line"></i>
+          <svg-icon name="line-chart" :size="32"/>
           <span>{{ chartEmptyText }}</span>
         </div>
-        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round icon="el-icon-close" @click.stop="toggleChartFullscreen($refs.chartWrap, chart)">退出横屏</el-button>
+        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round @click.stop="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon name="close" :size="14"/>退出横屏</el-button>
       </div>
     </div>
 
@@ -127,7 +127,7 @@
         <!-- 传感器区 -->
         <div class="edit-section">
           <div class="edit-section-head">
-            <span class="edit-section-icon el-icon-cpu"></span>
+            <svg-icon name="cpu" :size="16" class="edit-section-icon"/>
             <span class="edit-section-title">传感器</span>
             <span class="edit-section-count" v-if="editForm.sensors.length">{{ editForm.sensors.length }} 项</span>
           </div>
@@ -135,7 +135,7 @@
             <span class="edit-current-label">当前显示：</span>
             <span class="edit-tag" v-for="key in editForm.sensors" :key="key">
               {{ sensorLabel(key) }}（{{ sensorUnit(key) }}）
-              <i class="el-icon-close" @click="removeSensor(key)"></i>
+              <svg-icon name="close" :size="11" @click.native="removeSensor(key)"/>
             </span>
           </div>
           <div class="edit-hint" v-else>暂未选择任何传感器</div>
@@ -154,7 +154,7 @@
         <!-- 执行器区 -->
         <div class="edit-section">
           <div class="edit-section-head">
-            <span class="edit-section-icon el-icon-set-up"></span>
+            <svg-icon name="setup" :size="16" class="edit-section-icon"/>
             <span class="edit-section-title">执行器状态</span>
             <span class="edit-section-count" v-if="editForm.devices.length">{{ editForm.devices.length }} 项</span>
           </div>
@@ -162,7 +162,7 @@
             <span class="edit-current-label">当前显示：</span>
             <span class="edit-tag" v-for="key in editForm.devices" :key="key">
               {{ deviceLabel(key) }}
-              <i class="el-icon-close" @click="removeDevice(key)"></i>
+              <svg-icon name="close" :size="11" @click.native="removeDevice(key)"/>
             </span>
           </div>
           <div class="edit-hint" v-else>暂未选择任何执行器</div>
@@ -683,11 +683,14 @@ export default {
 
 <style scoped>
 .back-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 14px;
   color: #14b8a6;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
 }
 
 /* ===== 桌面端实时状态 ===== */
@@ -916,8 +919,7 @@ export default {
   z-index: 2;
 }
 
-.chart-empty i {
-  font-size: 32px;
+.chart-empty .svg-icon {
   color: #c0c4cc;
 }
 
@@ -946,7 +948,6 @@ export default {
 }
 
 .edit-section-icon {
-  font-size: 16px;
   color: #14b8a6;
 }
 
@@ -1000,14 +1001,13 @@ export default {
   background: rgba(20, 184, 166, 0.18);
 }
 
-.edit-tag .el-icon-close {
+.edit-tag .svg-icon {
   cursor: pointer;
-  font-size: 11px;
   color: #909399;
   transition: color 0.2s;
 }
 
-.edit-tag .el-icon-close:hover {
+.edit-tag .svg-icon:hover {
   color: #f56c6c;
 }
 

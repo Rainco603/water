@@ -5,11 +5,15 @@ import ElementUI from 'element-ui'
 import 'element-ui/lib/theme-chalk/index.css'
 import axios from './utils/request' // <-- 确保引入了 axios 封装
 import './assets/styles/global.css' // <-- 引入全局样式（浅色青绿主题）
+import SvgIcon from './components/SvgIcon.vue'
 
 Vue.config.productionTip = false
 
 // 挂载 ElementUI
 Vue.use(ElementUI)
+
+// 全局注册 2px 描边 SVG 图标组件（<svg-icon name="..."/>）
+Vue.component('svg-icon', SvgIcon)
 
 // 挂载 axios 到 Vue 原型，这样所有组件都能用 this.$http 访问
 Vue.prototype.$http = axios
