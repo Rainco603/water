@@ -104,6 +104,73 @@
       </div>
     </div>
 
+    <!-- 4. 历史定流量数据查询 -->
+    <div class="card-box">
+      <div class="card-title">历史定流量数据查询<span class="count" v-if="transferQueried">（共 {{ transferTotal }} 条）</span></div>
+      <div class="filter-form">
+        <div class="form-item form-item--filter">
+          <span class="label">水泵编号:</span>
+          <el-select v-model="transferFilter.device" size="mini" clearable placeholder="全部水泵">
+            <el-option v-for="p in pumpColumns" :key="p.key" :label="p.label" :value="p.key"></el-option>
+          </el-select>
+        </div>
+        <div class="form-item form-item--filter">
+          <span class="label">快捷时间:</span>
+          <el-select v-model="transferFilter.quickRange" size="mini">
+            <el-option label="自定义" value="custom"></el-option>
+            <el-option label="最近15分钟" value="15m"></el-option>
+            <el-option label="最近30分钟" value="30m"></el-option>
+            <el-option label="最近1小时" value="1h"></el-option>
+          </el-select>
+        </div>
+        <div class="form-item form-item--filter" v-show="transferFilter.quickRange === 'custom'">
+          <span class="label">时间范围:</span>
+          <roll-time-range-picker v-model="transferFilter.timeRange"></roll-time-range-picker>
+        </div>
+        <div class="form-actions">
+          <el-button type="primary" size="small" @click="queryTransferHistory" round>查 询</el-button>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>进水端</th>
+              <th>出水端</th>
+              <th>水泵编号</th>
+              <th>目标累计值(L)</th>
+              <th>运行时间</th>
+              <th>状态</th>
+              <th>开始时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in transferList" :key="item.id || index">
+              <td>{{ tankLabel(item.source) }}</td>
+              <td>{{ tankLabel(item.target) }}</td>
+              <td>{{ deviceLabel(item.device) }}</td>
+              <td>{{ formatLiters(item.target_liters) }}</td>
+              <td>{{ formatRuntime(item.runtime_seconds) }}</td>
+              <td><span class="t-status" :class="'t-status--' + transferStatusKey(item.status)">{{ transferStatusText(item.status) }}</span></td>
+              <td>{{ item.started_at || '--' }}</td>
+            </tr>
+            <tr v-if="transferList.length === 0">
+              <td colspan="7" style="text-align: center; padding: 20px;">
+                {{ transferQueried ? '暂无数据' : '请设置筛选条件后点击【查 询】' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" v-if="transferQueried && transferList.length > 0">
+        <el-button size="mini" :disabled="transferFilter.page === 1" @click="changeTransferPage(-1)">上一页</el-button>
+        <span>第 {{ transferFilter.page }} 页</span>
+        <el-button size="mini" :disabled="transferList.length < transferFilter.page_size" @click="changeTransferPage(1)">下一页</el-button>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -143,7 +210,13 @@ export default {
 
       // ===== 执行器状态曲线 =====
       actuatorChart: null,
-      actuatorChartQueried: false
+      actuatorChartQueried: false,
+
+      // ===== 历史定流量数据查询 =====
+      transferFilter: { device: '', quickRange: 'custom', timeRange: [], page: 1, page_size: 15 },
+      transferList: [],
+      transferTotal: 0,
+      transferQueried: false
     }
   },
   mounted() {
@@ -235,6 +308,11 @@ export default {
     // 类型下拉选项（仅传感器，执行器单独成区）
     sensorTypeOptions() {
       return this.sensorColumns.map(s => ({ value: s.key, label: s.label }))
+    },
+    // 历史定流量查询可筛选的水泵（仅泵类执行器）
+    pumpColumns() {
+      const pumps = this.actuatorColumns.filter(a => /pump/i.test(a.key))
+      return pumps.length ? pumps : this.actuatorColumns
     }
   },
   watch: {
@@ -696,6 +774,91 @@ export default {
     // 二者互斥——快捷时间选中时自定义时间范围被隐藏，查询/导出统一走这里。
     effectiveTimeRange() {
       return resolveQuickRange(this.filterData.quickRange, this.filterData.timeRange, this.formatDate);
+    },
+
+    // ===== 历史定流量数据查询 =====
+    // 水槽 id → 显示名（读主页本地维护的水槽列表）
+    tankLabel(id) {
+      try {
+        const raw = localStorage.getItem('iot_water_tanks')
+        if (raw) {
+          const arr = JSON.parse(raw)
+          const t = arr.find(x => String(x.id) === String(id))
+          if (t) return t.name
+        }
+      } catch (e) { /* 忽略 */ }
+      return id || '--'
+    },
+    // 水泵编号 → 显示名（复用执行器列表，兼容本地自定义 pump2 等）
+    deviceLabel(key) {
+      const d = this.actuatorColumns.find(a => a.key === key)
+      return d ? d.label : key
+    },
+    formatLiters(v) {
+      const n = Number(v)
+      return isNaN(n) ? '--' : n.toFixed(2)
+    },
+    // 运行时间（秒）→ 可读文本
+    formatRuntime(seconds) {
+      const s = Number(seconds)
+      if (isNaN(s)) return '--'
+      const total = Math.round(s)
+      if (total < 60) return total + ' 秒'
+      const h = Math.floor(total / 3600)
+      const m = Math.floor((total % 3600) / 60)
+      const sec = total % 60
+      if (h > 0) return h + ' 时 ' + m + ' 分 ' + sec + ' 秒'
+      return m + ' 分 ' + sec + ' 秒'
+    },
+    transferStatusText(status) {
+      const map = { running: '输送中', done: '已完成', stopped: '已停止', failed: '异常' }
+      return map[status] || (status || '--')
+    },
+    transferStatusKey(status) {
+      const map = { running: 'running', done: 'done', stopped: 'stopped', failed: 'failed' }
+      return map[status] || 'stopped'
+    },
+    // 定流量查询实际时间范围：快捷时间优先，否则自定义范围
+    effectiveTransferRange() {
+      return resolveQuickRange(this.transferFilter.quickRange, this.transferFilter.timeRange, this.formatDate)
+    },
+    async queryTransferHistory() {
+      this.transferFilter.page = 1
+      this.transferQueried = true
+      await this.fetchTransferHistory()
+    },
+    async fetchTransferHistory() {
+      try {
+        const range = this.effectiveTransferRange()
+        const hasRange = range && range.length === 2
+        const params = {
+          device: this.transferFilter.device || undefined,
+          start_time: hasRange ? range[0] : undefined,
+          end_time: hasRange ? range[1] : undefined,
+          page: this.transferFilter.page,
+          page_size: this.transferFilter.page_size
+        }
+        let res = await this.$http.get('/auto-transfer', { params })
+        res = unwrapData(res)
+        if (Array.isArray(res)) {
+          this.transferList = res
+          this.transferTotal = res.length
+        } else if (res && Array.isArray(res.data)) {
+          this.transferList = res.data
+          this.transferTotal = res.total || res.data.length
+        } else {
+          this.transferList = []
+          this.transferTotal = 0
+        }
+      } catch (error) {
+        this.$message.error('获取历史定流量数据失败，请确认后端已实现 /auto-transfer 列表接口')
+        this.transferList = []
+        this.transferTotal = 0
+      }
+    },
+    changeTransferPage(val) {
+      this.transferFilter.page += val
+      this.fetchTransferHistory()
     }
   }
 }
@@ -816,6 +979,31 @@ export default {
 .cell-act-off {
   background: #f1f3f5;
   color: #8a94a6;
+}
+
+/* 定流量任务状态标签 */
+.t-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.t-status--running {
+  background: #e6f7f2;
+  color: #14b8a6;
+}
+.t-status--done {
+  background: rgba(103, 194, 58, 0.12);
+  color: #67c23a;
+}
+.t-status--stopped {
+  background: rgba(144, 147, 153, 0.15);
+  color: #909399;
+}
+.t-status--failed {
+  background: rgba(245, 108, 108, 0.12);
+  color: #f56c6c;
 }
 
 /* ===== 分页 ===== */

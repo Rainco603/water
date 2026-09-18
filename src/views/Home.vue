@@ -304,6 +304,120 @@
       </div>
     </div>
 
+    <!-- 定流量输送（按目标累计升数自动开关水泵，达到目标后自动关泵） -->
+    <div class="card-box">
+      <div class="card-title">
+        定流量输送
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openTransferAdd"><svg-icon name="plus" :size="14"/>添加路径</el-button>
+      </div>
+
+      <!-- 进行中任务进度（优先展示） -->
+      <div v-if="activeTransfer" class="transfer-progress">
+        <div class="transfer-progress-head">
+          <span class="transfer-progress-title">{{ tankName(activeTransfer.source) }} → {{ tankName(activeTransfer.target) }}</span>
+          <span class="status-tag status-normal">输送中</span>
+        </div>
+        <div class="transfer-progress-meta">水泵：{{ deviceLabel(activeTransfer.device) }} · 目标 {{ formatLiters(activeTransfer.target_liters) }} L</div>
+        <el-progress :percentage="transferPercent" :show-text="false"></el-progress>
+        <div class="transfer-progress-meta">已输送 {{ formatLiters(activeTransfer.accumulated_liters) }} / {{ formatLiters(activeTransfer.target_liters) }} L</div>
+        <el-button size="mini" type="danger" plain @click="stopActiveTransfer">停止输送</el-button>
+      </div>
+
+      <!-- 桌面端：路径表格 -->
+      <div class="desktop-only" v-if="transferPaths.length">
+        <div class="table-scroll">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>进水端</th>
+                <th>出水端</th>
+                <th>水泵编号</th>
+                <th>目标升数(L)</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(p, index) in transferPaths" :key="p.id">
+                <td>{{ tankName(p.source) }}</td>
+                <td>{{ tankName(p.target) }}</td>
+                <td>{{ deviceLabel(p.device) }}</td>
+                <td>{{ formatLiters(p.target_liters) }}</td>
+                <td>
+                  <el-button size="mini" type="primary" plain :disabled="!!activeTransfer || !online" @click="startTransfer(p)">开始输送</el-button>
+                  <el-button size="mini" type="text" @click="openTransferEdit(index)">编辑</el-button>
+                  <el-button size="mini" type="text" style="color: #f56c6c;" @click="removeTransferPath(index)">删除</el-button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 移动端：路径卡片 -->
+      <div class="mobile-only" v-if="transferPaths.length">
+        <div class="schedule-card" v-for="(p, index) in transferPaths" :key="p.id">
+          <div class="schedule-card-row">
+            <span class="schedule-card-label">路径</span>
+            <span class="schedule-card-value">{{ tankName(p.source) }} → {{ tankName(p.target) }}</span>
+          </div>
+          <div class="schedule-card-row">
+            <span class="schedule-card-label">水泵</span>
+            <span class="schedule-card-value">{{ deviceLabel(p.device) }}</span>
+          </div>
+          <div class="schedule-card-row">
+            <span class="schedule-card-label">目标</span>
+            <span class="schedule-card-value">{{ formatLiters(p.target_liters) }} L</span>
+          </div>
+          <div class="schedule-card-actions">
+            <el-button size="mini" type="primary" plain :disabled="!!activeTransfer || !online" @click="startTransfer(p)">开始输送</el-button>
+            <el-button size="mini" type="text" @click="openTransferEdit(index)">编辑</el-button>
+            <el-button size="mini" type="text" style="color: #f56c6c;" @click="removeTransferPath(index)">删除</el-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!transferPaths.length" style="text-align: center; color: #909399; padding: 20px; font-size: 12px;">
+        暂无输送路径，点击右上角「添加路径」创建
+      </div>
+    </div>
+
+    <!-- 定流量输送路径编辑弹窗 -->
+    <el-dialog title="输送路径" :visible.sync="transferEditVisible" width="94%" :modal-append-to-body="true">
+      <div class="transfer-form">
+        <div class="transfer-row">
+          <div class="transfer-field">
+            <span class="transfer-label">进水端</span>
+            <el-select v-model="editTransferPath.source" size="mini" placeholder="进水水槽">
+              <el-option v-for="t in tankList" :key="t.id" :label="t.name" :value="t.id"></el-option>
+            </el-select>
+          </div>
+          <div class="transfer-arrow">→</div>
+          <div class="transfer-field">
+            <span class="transfer-label">出水端</span>
+            <el-select v-model="editTransferPath.target" size="mini" placeholder="出水水槽">
+              <el-option v-for="t in tankList" :key="t.id" :label="t.name" :value="t.id"></el-option>
+            </el-select>
+          </div>
+        </div>
+        <div class="transfer-row" style="margin-top: 12px;">
+          <div class="transfer-field">
+            <span class="transfer-label">水泵编号</span>
+            <el-select v-model="editTransferPath.device" size="mini" filterable placeholder="选择水泵">
+              <el-option v-for="d in pumpDevices" :key="d.key" :label="d.label" :value="d.key"></el-option>
+            </el-select>
+          </div>
+          <div class="transfer-field">
+            <span class="transfer-label">目标升数(L)</span>
+            <el-input-number v-model="editTransferPath.target_liters" size="mini" :min="0.1" :step="0.5" :precision="1" :controls="false"></el-input-number>
+          </div>
+        </div>
+      </div>
+      <span slot="footer">
+        <el-button size="mini" @click="transferEditVisible = false">取消</el-button>
+        <el-button size="mini" type="primary" @click="saveTransferPath">确定</el-button>
+      </span>
+    </el-dialog>
+
     <!-- 定时任务编辑弹窗 -->
     <el-dialog title="定时任务" :visible.sync="scheduleEditVisible" width="94%" :modal-append-to-body="true">
       <div class="form-item form-item--full">
@@ -400,6 +514,14 @@ export default {
       editSchedule: { deviceId: 'pump', actions: [{ time: '08:00:00', action: 1 }], repeat: 'daily' },
       scheduleNextId: 1, // 用于生成唯一ID
 
+      // ===== 定流量输送 =====
+      transferPaths: [], // 输送路径列表（本地持久化，支持增删改）
+      transferEditVisible: false,
+      editTransferPath: { id: null, source: '', target: '', device: 'pump', target_liters: 5.0 },
+      transferNextId: 1,
+      activeTransfer: null, // 进行中的定流量输送任务（后端 /auto-transfer 返回）
+      transferTimer: null,
+
       // ===== 预计时间/温度 =====
       predictField: 'temp1', // 当前推算的温度字段
       predictRateInput: null, // 手动填写的温度变化速率(℃/分)，null 表示用自动推算
@@ -418,6 +540,7 @@ export default {
     this.loadDeletedDeviceKeys()
     this.loadControlMode()
     this.loadSchedules()
+    this.loadTransferPaths()
     // 确保默认温度字段有效（用户可能已删除 temp1）
     if (!this.temperatureFields.some(s => s.key === this.predictField)) {
       this.predictField = this.temperatureFields.length ? this.temperatureFields[0].key : 'temp1'
@@ -435,6 +558,8 @@ export default {
     // 预计时间/温度：初始推算一次速率，之后每 60 秒刷新
     this.fetchPredictRate()
     this.predictTimer = setInterval(() => this.fetchPredictRate(), 60000)
+    // 定流量输送：每 2 秒轮询一次运行中任务的进度
+    this.transferTimer = setInterval(() => this.pollActiveTransfer(), 2000)
     // 初始化添加水槽表单默认名
     const nextId = Math.max(0, ...this.tankList.map(t => Number(t.id))) + 1
     this.addTankForm.defaultName = '水槽 ' + String(nextId).padStart(2, '0')
@@ -448,6 +573,9 @@ export default {
     }
     if (this.predictTimer) {
       clearInterval(this.predictTimer)
+    }
+    if (this.transferTimer) {
+      clearInterval(this.transferTimer)
     }
   },
   computed: {
@@ -535,6 +663,19 @@ export default {
       if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
       const temp = this.predictCurrent + rate * minutes
       return '预计 ' + temp.toFixed(1) + ' ℃'
+    },
+    // 定流量输送可选的水泵（仅泵类执行器，避免把加热器等混入）
+    pumpDevices() {
+      const pumps = this.devices.filter(d => /pump/i.test(d.key))
+      return pumps.length ? pumps : this.devices
+    },
+    // 进行中输送任务的进度百分比（0~100）
+    transferPercent() {
+      if (!this.activeTransfer) return 0
+      const target = Number(this.activeTransfer.target_liters)
+      const acc = Number(this.activeTransfer.accumulated_liters)
+      if (!target) return 0
+      return Math.min(100, Math.round(acc / target * 100))
     }
   },
   methods: {
@@ -1070,6 +1211,130 @@ export default {
           this.saveSchedules()
         }
       })
+    },
+
+    // ===== 定流量输送 =====
+    // 水槽 id → 显示名
+    tankName(id) {
+      const t = this.tankList.find(x => String(x.id) === String(id))
+      return t ? t.name : id
+    },
+    // 升数格式化（保留两位小数，非数字回退 0.0）
+    formatLiters(v) {
+      const n = Number(v)
+      return isNaN(n) ? '0.0' : n.toFixed(2)
+    },
+    // 从本地存储加载输送路径列表
+    loadTransferPaths() {
+      try {
+        const raw = localStorage.getItem('iot_water_transfer_paths')
+        if (raw) {
+          const arr = JSON.parse(raw)
+          if (Array.isArray(arr) && arr.length) this.transferPaths = arr
+        }
+      } catch (e) { /* 忽略 */ }
+      const maxId = this.transferPaths.reduce((max, p) => Math.max(max, p.id || 0), 0)
+      this.transferNextId = maxId + 1
+    },
+    saveTransferPathsToStorage() {
+      localStorage.setItem('iot_water_transfer_paths', JSON.stringify(this.transferPaths))
+    },
+    // 新增输送路径
+    openTransferAdd() {
+      this.editTransferPath = { id: null, source: '', target: '', device: 'pump', target_liters: 5.0 }
+      this.transferEditVisible = true
+    },
+    // 编辑输送路径
+    openTransferEdit(index) {
+      this.editTransferPath = JSON.parse(JSON.stringify(this.transferPaths[index]))
+      this.transferEditVisible = true
+    },
+    // 保存输送路径（新增或更新）
+    saveTransferPath() {
+      const p = this.editTransferPath
+      if (!p.source || !p.target) { this.$message.warning('请选择进水端和出水端'); return }
+      if (String(p.source) === String(p.target)) { this.$message.warning('进水端和出水端不能相同'); return }
+      if (!p.device) { this.$message.warning('请选择水泵'); return }
+      if (!(Number(p.target_liters) > 0)) { this.$message.warning('请输入有效的目标升数'); return }
+      if (p.id) {
+        const idx = this.transferPaths.findIndex(item => item.id === p.id)
+        if (idx >= 0) this.$set(this.transferPaths, idx, { ...p })
+      } else {
+        p.id = this.transferNextId++
+        this.transferPaths.push({ ...p })
+      }
+      this.saveTransferPathsToStorage()
+      this.transferEditVisible = false
+      this.$message.success('输送路径已保存')
+    },
+    // 删除输送路径
+    removeTransferPath(index) {
+      this.$confirm('确定删除该输送路径？', '提示', { type: 'warning' })
+        .then(() => {
+          this.transferPaths.splice(index, 1)
+          this.saveTransferPathsToStorage()
+          this.$message.success('已删除')
+        }).catch(() => {})
+    },
+    // 启动定流量输送任务：POST /auto-transfer，拿到任务后进入进度轮询
+    async startTransfer(path) {
+      if (!path || !path.source || !path.target) { this.$message.warning('请选择进水端和出水端'); return }
+      if (String(path.source) === String(path.target)) { this.$message.warning('进水端和出水端不能相同'); return }
+      if (!path.device) { this.$message.warning('请选择水泵'); return }
+      if (!(Number(path.target_liters) > 0)) { this.$message.warning('请输入有效的目标升数'); return }
+      if (!this.online) { this.$message.warning('设备离线，无法下发控制指令'); return }
+      if (this.activeTransfer) { this.$message.warning('已有进行中的输送任务'); return }
+      try {
+        const res = await this.$http.post('/auto-transfer', {
+          source: String(path.source),
+          target: String(path.target),
+          device: path.device,
+          target_liters: Number(path.target_liters)
+        })
+        const task = unwrapData(res)
+        if (task && task.id !== undefined) {
+          this.activeTransfer = { ...task }
+          this.$message.success('输送任务已启动')
+        } else {
+          this.$message.error('启动失败，请确认后端已实现 /auto-transfer 接口')
+        }
+      } catch (error) {
+        this.$message.error('启动输送失败：请确认后端已实现定流量输送接口')
+        console.error('startTransfer 失败：', error)
+      }
+    },
+    // 轮询运行中任务的进度；达标(done)时弹窗提示并停止轮询
+    async pollActiveTransfer() {
+      if (!this.activeTransfer || this.activeTransfer.id === undefined) return
+      try {
+        const res = await this.$http.get('/auto-transfer/' + this.activeTransfer.id)
+        const task = unwrapData(res)
+        if (!task) return
+        this.activeTransfer = { ...this.activeTransfer, ...task }
+        if (task.status === 'done') {
+          this.activeTransfer = null
+          this.$alert('定流量任务已完成', '提示', { type: 'success', confirmButtonText: '确定' }).catch(() => {})
+        } else if (task.status === 'failed') {
+          this.activeTransfer = null
+          this.$message.error('定流量输送任务异常终止')
+        } else if (task.status === 'stopped') {
+          this.activeTransfer = null
+        }
+      } catch (e) {
+        // 轮询失败静默忽略，避免频繁弹错误提示
+      }
+    },
+    // 手动停止运行中的输送任务
+    async stopActiveTransfer() {
+      if (!this.activeTransfer || this.activeTransfer.id === undefined) return
+      const id = this.activeTransfer.id
+      this.activeTransfer = null
+      try {
+        await this.$http.post('/auto-transfer/' + id + '/stop')
+        this.$message.success('已停止输送')
+      } catch (e) {
+        this.$message.error('停止失败，请确认后端已实现停止接口')
+      }
     },
 
     // 撤销上一次手动控制指令
@@ -1614,6 +1879,81 @@ export default {
   color: #14b8a6;
 }
 
+/* ===== 定流量输送 ===== */
+.transfer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transfer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.transfer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 150px;
+}
+
+.transfer-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.transfer-field .el-select,
+.transfer-field .el-input-number {
+  width: 100%;
+}
+
+.transfer-arrow {
+  align-self: flex-end;
+  color: var(--text-3);
+  font-size: 16px;
+  padding-bottom: 6px;
+}
+
+.transfer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.transfer-progress {
+  margin-top: 12px;
+  padding: 14px;
+  background: #f5f7fa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.transfer-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.transfer-progress-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.transfer-progress-meta {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 6px 0;
+}
+
+.transfer-progress .el-button {
+  margin-top: 10px;
+}
+
 /* ===== 响应式：手机端显示卡片，隐藏网格/表格 ===== */
 .mobile-only { display: none; }
 .desktop-only { display: block; }
@@ -1770,6 +2110,20 @@ export default {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px dashed var(--border);
+  }
+
+  /* 定流量输送：手机端表单单列 */
+  .transfer-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .transfer-field {
+    min-width: 0;
+  }
+  .transfer-arrow {
+    align-self: center;
+    transform: rotate(90deg);
+    padding: 0;
   }
 
   /* 弹窗全宽 */
