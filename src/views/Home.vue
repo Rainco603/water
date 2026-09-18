@@ -979,6 +979,8 @@ export default {
       this.editSchedule.actions = this.editSchedule.actions.filter(a => a.time)
 
       const s = this.editSchedule
+      // 确保新任务默认启用（后端若缺 enabled 字段，前端兜底为 true）
+      if (s.enabled === undefined) s.enabled = true
       if (s.id) {
         const idx = this.schedules.findIndex(item => item.id === s.id)
         if (idx >= 0) {
@@ -1027,7 +1029,8 @@ export default {
       const currentDay = now.getDay() // 0=周日, 6=周六
 
       this.schedules.forEach(schedule => {
-        if (!schedule.enabled) return
+        // enabled 缺失/空值视为启用（后端旧数据可能没有该字段，避免任务全部失效）
+        if (schedule.enabled === false || schedule.enabled === 0) return
 
         // 检查重复模式
         let shouldFire = false
