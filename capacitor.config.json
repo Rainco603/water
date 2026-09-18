@@ -1,0 +1,8 @@
+{
+  "appId": "com.iotwater.app",
+  "appName": "IoT水系统",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  }
+}
