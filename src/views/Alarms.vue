@@ -84,7 +84,10 @@
           class="alarm-stat-card"
           :class="'alarm-stat-card--' + t.key"
         >
-          <div class="alarm-stat-label">{{ t.label }}</div>
+          <div class="alarm-stat-label">
+            <svg-icon :name="alarmTypeIcon(t.key)" :size="15" class="alarm-stat-icon"/>
+            {{ t.label }}
+          </div>
           <div class="alarm-stat-value">{{ t.count }}<i class="unit">条</i></div>
         </div>
       </div>
@@ -429,6 +432,16 @@ export default {
     },
 
     // 按报警文本关键词归类报警类型（高温/低温/压力/流量/水位/其他）
+    alarmTypeIcon() {
+      return (key) => ({
+        temp_high: 'temp-high',
+        temp_low: 'temp-low',
+        pressure: 'pressure-warn',
+        flow: 'flow-warn',
+        level: 'level-warn',
+        other: 'alarm'
+      })[key] || 'alarm'
+    },
     classifyAlarmType(text) {
       const t = String(text || '');
       const rules = [
@@ -987,6 +1000,14 @@ export default {
   font-size: 12px;
   color: #909399;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.alarm-stat-icon {
+  color: var(--primary);
 }
 
 .alarm-stat-value {

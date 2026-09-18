@@ -39,7 +39,37 @@ const ICONS = {
   'arrow-up': '<polyline points="18 15 12 9 6 15"/>',
   'arrow-down': '<polyline points="6 9 12 15 18 9"/>',
   droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
-  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+
+  /* ===== 卡片专属图标（24×24 2px 描边，与全站线性风统一） ===== */
+  // 水槽（Home 监测单元列表 / TankDetail 详情页）
+  tank: '<path d="M4 6a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z"/><path d="M4 8h16"/>',
+  // 水温（实时传感 / 传感器卡片）
+  temperature: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M15 10.5a3 3 0 0 1 0 4.5 3.5 3.5 0 1 1-6 0 3 3 0 0 1 0-4.5"/>',
+  // 压力（压力计 + 指针）
+  pressure: '<circle cx="12" cy="14" r="8"/><path d="M12 14l4-4"/><circle cx="12" cy="14" r="1.5"/>',
+  // 流量（水滴 + 对勾）
+  flow: '<path d="M12 2.7l5.66 5.66a8 8 0 1 1-11.31 0z"/><polyline points="9 13 11 15 15 11"/>',
+  // 水泵（涡轮/叶轮）
+  pump: '<circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="8"/><path d="M12 3.5v3M20.5 12h-3M12 20.5v-3M3.5 12h3"/>',
+  // 加热器（波浪热力）
+  heater: '<path d="M4 17h16"/><path d="M6 17V6"/><path d="M6 8c1.2-1.5 2.4 0 3.6-1.5S12 6.5 12 5"/>',
+  // 设备使用时长（时钟）
+  duration: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+  // 设备运行状态（开关/运行指示灯）
+  'device-status': '<circle cx="12" cy="12" r="9"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/>',
+  // 系统状态（仪表盘/系统）
+  system: '<circle cx="12" cy="12" r="9"/><path d="M12 12l4-4M8 12h4"/>',
+  // 高温（温度计 + 加号）
+  'temp-high': '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M15 10.5a3 3 0 0 1 0 4.5 3.5 3.5 0 1 1-6 0 3 3 0 0 1 0-4.5"/><path d="M12 5v3M10.5 6.5h3"/>',
+  // 低温（温度计 + 减号）
+  'temp-low': '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M15 10.5a3 3 0 0 1 0 4.5 3.5 3.5 0 1 1-6 0 3 3 0 0 1 0-4.5"/><path d="M10.5 6.5h3"/>',
+  // 压力异常（警示圈 + 感叹号）
+  'pressure-warn': '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V13"/><circle cx="12" cy="16.5" r="0.5"/>',
+  // 流量异常（警示三角 + 水滴）
+  'flow-warn': '<path d="M12 3l10 17H2z"/><path d="M12 9v6"/><circle cx="12" cy="17.5" r="0.5"/>',
+  // 水位异常（警示圈 + 水位线）
+  'level-warn': '<circle cx="12" cy="12" r="9"/><path d="M12 3v4M3 12h4"/><path d="M8 13l2.5-3 2 2 2.5-3L20 14"/>'
 }
 
 export default {

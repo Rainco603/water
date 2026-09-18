@@ -60,6 +60,8 @@ export default {
     }
   },
   mounted() {
+    // 首次用户交互时解锁音频（移动端浏览器需用户手势后才能出声）
+    this.unlockAudio()
     // 全局轮询活跃告警，发现新报警就弹窗提示（1-5b）
     this.fetchActiveAlarms()
     this.alarmTimer = setInterval(this.fetchActiveAlarms, 5000)
@@ -92,6 +94,7 @@ export default {
           const isRecovery = a.src === 'recovery' || a.level === 'info'
           const isSafety = a.src === 'safety'
           const isDanger = a.level === 'danger' || isSafety
+          if (!isRecovery) this.playAlarmSound()
           this.$notify({
             title: isRecovery ? '恢复正常' : (isSafety ? '安全保护' : (isDanger ? '严重报警' : '报警提醒')),
             message: a.alarm || '',
@@ -127,6 +130,7 @@ export default {
             const isRecovery = a.src === 'recovery' || a.level === 'info'
             const isSafety = a.src === 'safety'
             const isDanger = a.level === 'danger' || isSafety
+            if (!isRecovery) this.playAlarmSound()
             this.$notify({
               title: isRecovery ? '恢复正常' : (isSafety ? '安全保护' : (isDanger ? '严重报警' : '报警提醒')),
               message: a.alarm,
@@ -142,6 +146,42 @@ export default {
     },
     alarmKey(a) {
       return `${a.timestamp}__${a.alarm}`
+    },
+    // 首次用户交互时解锁音频上下文（移动端浏览器要求用户手势后才能出声）
+    unlockAudio() {
+      const unlock = () => {
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext
+          if (Ctx) {
+            const ctx = this._audioCtx || (this._audioCtx = new Ctx())
+            if (ctx.state === 'suspended') ctx.resume()
+          }
+        } catch (e) { /* 忽略音频解锁异常 */ }
+      }
+      window.addEventListener('touchstart', unlock, { once: true })
+      window.addEventListener('pointerdown', unlock, { once: true })
+    },
+    // 播放一声「叮」报警音效（Web Audio 合成，无需音频文件，离线可用）
+    playAlarmSound() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext
+        if (!Ctx) return
+        const ctx = this._audioCtx || (this._audioCtx = new Ctx())
+        if (ctx.state === 'suspended') ctx.resume()
+        const now = ctx.currentTime
+        // 单音「叮」（E6），清脆短促
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = 1318.51 // E6
+        gain.gain.setValueAtTime(0.0001, now)
+        gain.gain.exponentialRampToValueAtTime(0.35, now + 0.012)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now)
+        osc.stop(now + 0.65)
+      } catch (e) { /* 忽略播放异常 */ }
     }
   }
 }

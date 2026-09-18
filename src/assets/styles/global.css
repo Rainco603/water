@@ -366,4 +366,10 @@ ul, li {
   .el-dialog {
     width: 92% !important;
   }
+
+  /* MessageBox（确认/提示/输入框）宽度适配手机端，避免超出屏幕 */
+  .el-message-box {
+    width: 90% !important;
+    max-width: 400px;
+  }
 }

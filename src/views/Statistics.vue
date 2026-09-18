@@ -21,7 +21,10 @@
           class="stat-card"
           :class="c.type === 'total' ? 'stat-card--total' : ''"
         >
-          <div class="stat-card-label">{{ c.label }}</div>
+          <div class="stat-card-label">
+            <svg-icon :name="statIcon(c.field)" :size="15" class="stat-card-icon"/>
+            {{ c.label }}
+          </div>
           <div class="stat-card-value">
             {{ c.value }}<i v-if="c.unit" class="unit">{{ c.unit }}</i>
           </div>
@@ -62,6 +65,7 @@
     <div class="card-box">
       <div class="card-title">
         设备使用时长
+        <svg-icon name="duration" :size="16" class="card-title-icon"/>
         <span class="stat-window">
           <el-radio-group v-model="usageWindow" size="mini" @change="fetchUsageDurations">
             <el-radio-button label="1h">1小时</el-radio-button>
@@ -75,7 +79,7 @@
 
     <!-- 3. 设备运行状态（运行中 / 关闭） -->
     <div class="card-box">
-      <div class="card-title">设备运行状态</div>
+      <div class="card-title">设备运行状态 <svg-icon name="device-status" :size="16" class="card-title-icon"/></div>
       <div class="device-run-grid">
         <div class="device-run-card device-run-card--on">
           <div class="device-run-num">{{ runningCount }}</div>
@@ -90,7 +94,7 @@
 
     <!-- 4. 系统状态（正常 / 异常占比环形图） -->
     <div class="card-box">
-      <div class="card-title">系统状态</div>
+      <div class="card-title">系统状态 <svg-icon name="system" :size="16" class="card-title-icon"/></div>
       <div v-if="systemTotal > 0" ref="systemChart" class="system-chart" style="width: 100%; height: 220px;"></div>
       <div v-else style="text-align:center;color:#909399;padding:24px;font-size:12px;">
         暂无阈值数据，无法统计系统状态
@@ -279,6 +283,16 @@ export default {
         cards.push({ id: this.statNextId++, field: 'flow', mode: 'total' })
       }
       return cards
+    },
+    // 统计卡片图标映射（与 Home 传感卡片一致）
+    statIcon() {
+      return (key) => {
+        if (/temp/i.test(key)) return 'temperature'
+        if (/pressure/i.test(key)) return 'pressure'
+        if (/flow/i.test(key)) return 'flow'
+        if (/level|water|液位|水位/i.test(key)) return 'level-warn'
+        return 'droplet'
+      }
     },
     loadStatCards() {
       try {
@@ -621,6 +635,19 @@ export default {
   font-size: 12px;
   color: #909399;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.stat-card-icon {
+  color: var(--primary);
+}
+
+.card-title-icon {
+  color: var(--primary);
+  margin-right: 4px;
 }
 
 .stat-card-value {

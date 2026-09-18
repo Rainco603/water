@@ -97,6 +97,7 @@
       <div class="mobile-only">
         <div class="sensor-card" v-for="item in sensorItems" :key="item.key">
           <div class="sensor-card-header">
+            <svg-icon :name="sensorIcon(item.key)" :size="18" class="sensor-card-icon"/>
             <span class="sensor-card-label">{{ item.label }}</span>
             <span class="sensor-card-unit">{{ item.unit }}</span>
           </div>
@@ -128,6 +129,7 @@
       <div class="desktop-only">
         <div class="control-grid">
           <div class="control-item" v-for="d in devices" :key="d.key">
+            <svg-icon :name="deviceIcon(d.key)" :size="22" class="control-item-icon"/>
             <span class="conn-tag" :class="online ? 'conn-online' : 'conn-offline'">
               <i class="conn-dot"></i>{{ online ? '在线' : '离线' }}
             </span>
@@ -150,6 +152,7 @@
       <div class="mobile-only">
         <div class="control-card" v-for="d in devices" :key="d.key">
           <div class="control-card-header">
+            <svg-icon :name="deviceIcon(d.key)" :size="18" class="control-card-icon"/>
             <span class="control-card-name">{{ d.label }}</span>
             <span class="conn-tag" :class="online ? 'conn-online' : 'conn-offline'">
               <i class="conn-dot"></i>{{ online ? '在线' : '离线' }}
@@ -464,6 +467,24 @@ export default {
     temperatureFields() {
       const list = this.sensorItems.filter(s => (s.unit || '').indexOf('℃') >= 0 || /temp/i.test(s.key))
       return list.length ? list : this.sensorItems
+    },
+    // 传感器卡片图标映射
+    sensorIcon() {
+      return (key) => {
+        if (/temp/i.test(key)) return 'temperature'
+        if (/pressure/i.test(key)) return 'pressure'
+        if (/flow/i.test(key)) return 'flow'
+        if (/level|water|液位|水位/i.test(key)) return 'level-warn'
+        return 'droplet'
+      }
+    },
+    // 执行器/设备图标映射
+    deviceIcon() {
+      return (key) => {
+        if (/pump/i.test(key)) return 'pump'
+        if (/heat/i.test(key)) return 'heater'
+        return 'setup'
+      }
     },
     // 当前温度数值（解析失败返回 null）
     predictCurrent() {
@@ -1355,6 +1376,15 @@ export default {
   font-size: 12px;
 }
 
+.control-item-icon {
+  color: var(--primary);
+}
+
+.control-card-icon {
+  color: var(--primary);
+  margin-right: 2px;
+}
+
 .control-status {
   font-size: 15px;
   font-weight: 600;
@@ -1641,9 +1671,13 @@ export default {
   }
   .sensor-card-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 6px;
     margin-bottom: 8px;
+  }
+  .sensor-card-icon {
+    color: var(--primary);
   }
   .sensor-card-label {
     font-size: 13px;

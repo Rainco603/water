@@ -24,6 +24,7 @@
           <div class="status-info">
             <!-- 传感器卡片 -->
             <div class="info-item" v-for="s in displaySensors" :key="s.key">
+              <svg-icon :name="sensorIcon(s.key)" :size="16" class="i-icon"/>
               <span class="i-label">{{ s.label }}</span>
               <span class="i-value">{{ sensorData[s.key] !== undefined ? sensorData[s.key] : '--' }} <i class="unit">{{ s.unit }}</i></span>
               <span class="i-stat">
@@ -34,6 +35,7 @@
             </div>
             <!-- 执行器状态卡片 -->
             <div class="info-item" v-for="d in displayDevices" :key="d.key">
+              <svg-icon :name="deviceIcon(d.key)" :size="16" class="i-icon"/>
               <span class="i-label">{{ d.label }}</span>
               <span class="i-value" :class="deviceStatus[d.key] ? 'text-success' : 'text-gray'">
                 {{ deviceStatus[d.key] ? '开启中' : '已停止' }}
@@ -63,6 +65,7 @@
           <!-- 传感器卡片 -->
           <div class="tank-sensor-card" v-for="s in displaySensors" :key="s.key">
             <div class="tank-sensor-header">
+              <svg-icon :name="sensorIcon(s.key)" :size="16" class="tank-sensor-icon"/>
               <span class="tank-sensor-label">{{ s.label }}</span>
               <span class="tank-sensor-unit">{{ s.unit }}</span>
             </div>
@@ -75,7 +78,10 @@
           </div>
           <!-- 执行器卡片 -->
           <div class="tank-device-card" v-for="d in displayDevices" :key="d.key">
-            <div class="tank-device-name">{{ d.label }}</div>
+            <div class="tank-device-head">
+              <svg-icon :name="deviceIcon(d.key)" :size="16" class="tank-device-icon"/>
+              <span class="tank-device-name">{{ d.label }}</span>
+            </div>
             <div class="tank-device-status" :class="deviceStatus[d.key] ? 'status-normal' : 'status-warn'">
               {{ deviceStatus[d.key] ? '开启中' : '已停止' }}
             </div>
@@ -647,6 +653,24 @@ export default {
       return n.toFixed(1)
     },
 
+    // 传感器/执行器图标映射（与 Home 页一致）
+    sensorIcon() {
+      return (key) => {
+        if (/temp/i.test(key)) return 'temperature'
+        if (/pressure/i.test(key)) return 'pressure'
+        if (/flow/i.test(key)) return 'flow'
+        if (/level|water|液位|水位/i.test(key)) return 'level-warn'
+        return 'droplet'
+      }
+    },
+    deviceIcon() {
+      return (key) => {
+        if (/pump/i.test(key)) return 'pump'
+        if (/heat/i.test(key)) return 'heater'
+        return 'setup'
+      }
+    },
+
     formatStat(key, val) {
       if (val === undefined || val === null || val === '--') return '--'
       return val
@@ -744,11 +768,30 @@ export default {
 
 .info-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   background: #f5f7fa;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   padding: 10px 12px;
-  border-radius: 10px;
+}
+
+.info-item .i-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.info-item .i-icon {
+  color: var(--primary);
+}
+
+.info-item .i-value {
+  width: 100%;
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--primary);
 }
 
 .i-label {
@@ -824,9 +867,14 @@ export default {
 
 .tank-sensor-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 6px;
   margin-bottom: 6px;
+}
+
+.tank-sensor-icon {
+  color: var(--primary);
 }
 
 .tank-sensor-label {
@@ -837,6 +885,7 @@ export default {
 .tank-sensor-unit {
   font-size: 12px;
   color: var(--text-3);
+  margin-left: auto;
 }
 
 .tank-sensor-value {
@@ -863,6 +912,16 @@ export default {
   border-radius: 10px;
   padding: 14px;
   gap: 10px;
+}
+
+.tank-device-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tank-device-icon {
+  color: var(--primary);
 }
 
 .tank-device-name {
