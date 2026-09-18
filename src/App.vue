@@ -2,9 +2,14 @@
   <div id="app">
     <!-- 顶部标题栏 -->
     <header class="app-header">
-      <div class="logo">
-        <span class="logo-badge"><img class="icon" src="./assets/logo.png" alt="logo"></span>
-        <span class="logo-text">IoT 水系统智能监控平台</span>
+      <div class="header-left">
+        <button v-if="!hideTab" class="hamburger" @click="openDrawer" aria-label="打开导航菜单">
+          <svg-icon name="menu" :size="22"></svg-icon>
+        </button>
+        <div class="logo">
+          <span class="logo-badge"><img class="icon" src="./assets/logo.png" alt="logo"></span>
+          <span class="logo-text">IoT 水系统智能监控平台</span>
+        </div>
       </div>
       <svg-icon name="droplet" :size="20" class="header-drop"></svg-icon>
     </header>
@@ -14,28 +19,46 @@
       <router-view />
     </main>
 
-    <!-- 底部导航栏 -->
+    <!-- 左侧抽屉导航（7 大功能区全量入口） -->
+    <el-drawer
+      title="功能导航"
+      :visible.sync="drawerVisible"
+      direction="ltr"
+      size="260px"
+      :append-to-body="true"
+      class="nav-drawer"
+    >
+      <div class="drawer-body">
+        <div
+          v-for="item in navItems"
+          :key="item.path"
+          class="drawer-item"
+          :class="{ active: $route.path === item.path }"
+          @click="navTo(item.path)"
+        >
+          <svg-icon :name="item.icon" :size="20" class="drawer-icon"></svg-icon>
+          <div class="drawer-text">
+            <span class="drawer-title">{{ item.title }}</span>
+            <span class="drawer-sub">{{ item.sub }}</span>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 底部导航栏（3 快捷入口：实时监测 / 设备控制 / 更多） -->
     <footer v-if="!hideTab" class="app-footer">
       <router-link to="/" class="tab-item" active-class="active">
-        <svg-icon name="home" :size="22"></svg-icon>
-        <span class="text">主页</span>
+        <svg-icon name="monitor" :size="22"></svg-icon>
+        <span class="text">实时监测</span>
       </router-link>
-      <router-link to="/records" class="tab-item" active-class="active">
-        <svg-icon name="record" :size="22"></svg-icon>
-        <span class="text">记录</span>
+      <router-link to="/control" class="tab-item" active-class="active">
+        <svg-icon name="control" :size="22"></svg-icon>
+        <span class="text">设备控制</span>
       </router-link>
-      <router-link to="/alarms" class="tab-item" active-class="active">
-        <svg-icon name="alarm" :size="22"></svg-icon>
-        <span class="text">报警</span>
-      </router-link>
-      <router-link to="/statistics" class="tab-item" active-class="active">
-        <svg-icon name="statistics" :size="22"></svg-icon>
-        <span class="text">统计</span>
-      </router-link>
-      <router-link to="/config" class="tab-item" active-class="active">
-        <svg-icon name="settings" :size="22"></svg-icon>
-        <span class="text">配置</span>
-      </router-link>
+      <div class="tab-item" @click="openDrawer">
+        <svg-icon name="more" :size="22"></svg-icon>
+        <span class="text">更多</span>
+      </div>
     </footer>
   </div>
 </template>
@@ -48,6 +71,17 @@ export default {
   name: 'App',
   data() {
     return {
+      drawerVisible: false,
+      // 7 大功能区导航项（抽屉全量入口）
+      navItems: [
+        { path: '/', icon: 'monitor', title: '实时监测', sub: 'Realtime Monitor' },
+        { path: '/control', icon: 'control', title: '设备控制', sub: 'Device Control' },
+        { path: '/records', icon: 'record', title: '历史数据', sub: 'History' },
+        { path: '/alarms', icon: 'alarm', title: '报警管理', sub: 'Alarms' },
+        { path: '/rules', icon: 'rules', title: '智能规则引擎', sub: 'Rules Engine' },
+        { path: '/statistics', icon: 'statistics', title: '统计分析', sub: 'Statistics' },
+        { path: '/ops', icon: 'settings', title: '系统运维', sub: 'Operations' }
+      ],
       alarmTimer: null,
       seenAlarms: {}, // 记录已弹窗的报警，避免重复弹
       alarmInitialized: false,
@@ -78,6 +112,16 @@ export default {
     }
   },
   methods: {
+    openDrawer() {
+      this.drawerVisible = true
+    },
+    navTo(path) {
+      this.drawerVisible = false
+      if (this.$route.path !== path) {
+        this.$router.push(path)
+      }
+    },
+
     // 建立 SSE 长连接：接收后端实时事件推送
     // 注意：后端把事件放进队列推送，前端必须保持连接并读取事件，否则队列会占满
     initSSE() {
@@ -210,10 +254,38 @@ export default {
   box-shadow: 0 2px 10px rgba(13, 148, 136, 0.25);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* 汉堡按钮 */
+.hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.hamburger:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .logo {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .logo-badge {
@@ -225,6 +297,7 @@ export default {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 8px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .logo-badge .icon {
@@ -237,10 +310,14 @@ export default {
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-drop {
   opacity: 0.85;
+  flex-shrink: 0;
 }
 
 /* 主内容区样式 */
@@ -261,5 +338,70 @@ export default {
   align-items: center;
   flex-shrink: 0;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ===== 抽屉导航 ===== */
+.nav-drawer .el-drawer__body {
+  padding: 0;
+}
+
+.drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  cursor: pointer;
+  color: var(--text-1);
+  transition: background 0.2s, color 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.drawer-item:hover {
+  background: #f5f7fa;
+}
+
+.drawer-item.active {
+  background: rgba(20, 184, 166, 0.08);
+  border-left-color: var(--primary);
+  color: var(--primary);
+}
+
+.drawer-icon {
+  flex-shrink: 0;
+}
+
+.drawer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drawer-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.drawer-sub {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.drawer-item.active .drawer-sub {
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+/* 手机端标题字号略缩，避免汉堡挤占 */
+@media (max-width: 640px) {
+  .logo-text {
+    font-size: 14px;
+  }
 }
 </style>

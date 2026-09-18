@@ -41,6 +41,18 @@ const ICONS = {
   droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
   search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
 
+  /* ===== 导航专属图标（抽屉/底部） ===== */
+  // 汉堡菜单（三横线）
+  menu: '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+  // 更多（三点）
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  // 实时监测（显示器 + 脉搏线）
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><polyline points="6 10 9 10 10.5 7 13 13 14.5 10 18 10"/>',
+  // 设备控制（拨杆开关）
+  control: '<rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="8" cy="12" r="3.5"/>',
+  // 智能规则引擎（分支）
+  rules: '<line x1="6" y1="3" x2="6" y2="15"/><path d="M6 9h12"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v-3"/>',
+
   /* ===== 卡片专属图标（24×24 2px 描边，与全站线性风统一） ===== */
   // 水槽（Home 监测单元列表 / TankDetail 详情页）
   tank: '<path d="M4 6a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z"/><path d="M4 8h16"/>',

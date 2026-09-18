@@ -1,112 +1,7 @@
 <template>
   <div class="home-page">
 
-    <!-- 1. 监测单元（水槽）列表 -->
-    <div class="card-box">
-      <div class="card-title">
-        监测单元列表
-        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openAddTankDialog"><svg-icon name="plus" :size="14"/>添加水槽</el-button>
-      </div>
-      <div class="tank-list">
-        <div
-          v-for="tank in tankList"
-          :key="tank.id"
-          class="tank-card"
-          @click="goToDetail(tank.id)"
-        >
-          <span class="tank-delete" @click.stop="removeTank(tank)">×</span>
-          <div class="tank-icon">💧</div>
-          <div class="tank-name">{{ tank.name }}</div>
-          <div class="tank-running">
-            {{ runningDeviceCount }} 个执行器运行中
-          </div>
-          <div class="tank-status" :class="isSystemNormal ? 'status-normal' : 'status-danger'">
-            {{ isSystemNormal ? '正常' : '异常' }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 添加水槽弹窗（移动端友好的全宽弹窗） -->
-    <el-dialog title="添加水槽" :visible.sync="addTankDialogVisible" width="94%" :modal-append-to-body="true">
-      <div class="form-item form-item--full">
-        <span class="label">水槽名称：</span>
-        <el-input v-model="addTankForm.name" size="small" :placeholder="addTankForm.defaultName" style="flex: 1;" maxlength="20"></el-input>
-      </div>
-      <span slot="footer">
-        <el-button size="small" @click="addTankDialogVisible = false">取消</el-button>
-        <el-button type="primary" size="small" @click="confirmAddTank">确定</el-button>
-      </span>
-    </el-dialog>
-
-    <!-- 1.5 预计时间/温度（目标温度 ↔ 预计时长 双向推算） -->
-    <div class="card-box">
-      <div class="card-title">
-        预计时间 / 温度
-        <el-select v-model="predictField" size="mini" style="width: 110px; margin-left: 12px;" @change="onPredictFieldChange">
-          <el-option v-for="s in temperatureFields" :key="s.key" :label="s.label" :value="s.key"></el-option>
-        </el-select>
-      </div>
-      <div class="predict-row">
-        <span class="predict-label">当前温度</span>
-        <span class="predict-current">{{ predictCurrentText }}</span>
-        <span class="predict-rate">
-          变化速率
-          <el-input-number v-model="predictRateInput" size="mini" :step="0.1" :precision="2" :controls="false" placeholder="自动" style="width: 72px;"></el-input-number>
-          ℃/分
-        </span>
-      </div>
-      <div class="predict-hint" v-if="!isManualRate">自动速率：{{ predictRateText }}（近 15 分钟加权推算，可手动填写）</div>
-      <div class="predict-grid">
-        <div class="predict-item">
-          <div class="predict-item-label">填目标温度 → 预计时间</div>
-          <div class="predict-input-row">
-            <el-input-number v-model="predictTarget" size="small" :step="1" :precision="1" :controls="false" placeholder="目标温度" style="flex: 1;"></el-input-number>
-            <span class="predict-unit">℃</span>
-          </div>
-          <div class="predict-result">{{ predictTimeText }}</div>
-        </div>
-        <div class="predict-item">
-          <div class="predict-item-label">填分钟数 → 预计温度</div>
-          <div class="predict-input-row">
-            <el-input-number v-model="predictMinutes" size="small" :step="1" :precision="0" :controls="false" placeholder="分钟数" style="flex: 1;"></el-input-number>
-            <span class="predict-unit">分钟</span>
-          </div>
-          <div class="predict-result">{{ predictTempText }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. 实时传感器数据 -->
-    <div class="card-box">
-      <div class="card-title">
-        实时传感数据
-        <span class="time">{{ sensorData.timestamp }}</span>
-        <el-button size="mini" type="primary" plain style="margin-left: 10px;" @click="openSensorEdit"><svg-icon name="edit" :size="14"/>编辑</el-button>
-      </div>
-      <!-- 桌面端：网格 -->
-      <div class="desktop-only">
-        <div class="data-grid">
-          <div class="data-item" v-for="item in sensorItems" :key="item.key">
-            <span class="data-label">{{ item.label }}</span>
-            <span class="data-value">{{ sensorData[item.key] !== undefined ? sensorData[item.key] : '--' }} <i class="unit">{{ item.unit }}</i></span>
-          </div>
-        </div>
-      </div>
-      <!-- 移动端：卡片列表 -->
-      <div class="mobile-only">
-        <div class="sensor-card" v-for="item in sensorItems" :key="item.key">
-          <div class="sensor-card-header">
-            <svg-icon :name="sensorIcon(item.key)" :size="18" class="sensor-card-icon"/>
-            <span class="sensor-card-label">{{ item.label }}</span>
-            <span class="sensor-card-unit">{{ item.unit }}</span>
-          </div>
-          <div class="sensor-card-value">{{ sensorData[item.key] !== undefined ? sensorData[item.key] : '--' }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. 设备控制（含自动/手动模式切换 + 设备在线状态） -->
+    <!-- 设备控制（含自动/手动模式切换 + 设备在线状态） -->
     <div class="card-box">
       <div class="card-title">
         设备控制
@@ -176,46 +71,6 @@
         <el-button size="mini" plain type="warning" @click="undoLastControl"><svg-icon name="undo" :size="14"/>撤销上次手动控制</el-button>
       </div>
     </div>
-
-    <!-- 5. 智能判定结果 -->
-    <div class="card-box">
-      <div class="card-title">智能判定结果 <span class="time">{{ judgeResult.time }}</span></div>
-      <div class="judge-result">
-        <div class="judge-row">
-          <span class="data-label">系统运行状态：</span>
-          <span class="status-tag" :class="getStatusClass(judgeResult.status)">
-            {{ judgeResult.message || '等待数据...' }}
-          </span>
-        </div>
-        <div class="judge-row">
-          <span class="data-label">建议动作：</span>
-          <span class="judge-action">{{ judgeActionText(judgeResult.action) }}</span>
-        </div>
-        <div class="judge-row">
-          <span class="data-label">判定结论：</span>
-          <span class="judge-conclusion">{{ judgeConclusionText(judgeResult.status) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 编辑传感数据弹窗 -->
-    <el-dialog title="编辑传感数据（名称 / 单位）" :visible.sync="sensorEditVisible" width="94%" :modal-append-to-body="true">
-      <div class="sensor-edit-list">
-        <div class="sensor-edit-row" v-for="(item, index) in editSensorItems" :key="index">
-          <el-input v-model="item.key" size="mini" placeholder="字段(如 temp1)" style="width: 80px;"></el-input>
-          <el-input v-model="item.label" size="mini" placeholder="名称" style="flex: 1; min-width: 80px;"></el-input>
-          <el-input v-model="item.unit" size="mini" placeholder="单位" style="width: 70px;"></el-input>
-          <el-button size="mini" type="danger" plain @click="removeSensorItem(index)"><svg-icon name="delete" :size="14"/></el-button>
-        </div>
-      </div>
-      <div style="margin-top: 10px;">
-        <el-button size="mini" type="primary" plain @click="addSensorItem"><svg-icon name="plus" :size="14"/>添加一项</el-button>
-      </div>
-      <span slot="footer">
-        <el-button size="mini" @click="sensorEditVisible = false">取消</el-button>
-        <el-button size="mini" type="primary" @click="saveSensorItems">保存</el-button>
-      </span>
-    </el-dialog>
 
     <!-- 编辑设备弹窗 -->
     <el-dialog title="编辑设备（名称 / 控制字段）" :visible.sync="deviceEditVisible" width="94%" :modal-append-to-body="true">
@@ -320,6 +175,7 @@
         <div class="transfer-progress-meta">水泵：{{ deviceLabel(activeTransfer.device) }} · 目标 {{ formatLiters(activeTransfer.target_liters) }} L</div>
         <el-progress :percentage="transferPercent" :show-text="false"></el-progress>
         <div class="transfer-progress-meta">已输送 {{ formatLiters(activeTransfer.accumulated_liters) }} / {{ formatLiters(activeTransfer.target_liters) }} L</div>
+        <div class="transfer-progress-meta">累计流量：{{ formatLiters(sensorData.flow_total) }} L</div>
         <el-button size="mini" type="danger" plain @click="stopActiveTransfer">停止输送</el-button>
       </div>
 
@@ -378,6 +234,48 @@
 
       <div v-if="!transferPaths.length" style="text-align: center; color: #909399; padding: 20px; font-size: 12px;">
         暂无输送路径，点击右上角「添加路径」创建
+      </div>
+    </div>
+
+    <!-- 输送任务记录（后端 /auto-transfer 列表） -->
+    <div class="card-box">
+      <div class="card-title">
+        输送任务记录
+        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="fetchTransferHistory"><svg-icon name="refresh" :size="14"/>刷新</el-button>
+      </div>
+      <div v-if="transferHistory.length" class="table-scroll">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>开始时间</th>
+              <th>路径</th>
+              <th>水泵</th>
+              <th>目标(L)</th>
+              <th>已输送(L)</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in transferHistory" :key="t.id">
+              <td>{{ t.started_at || '-' }}</td>
+              <td>{{ tankName(t.source) }} → {{ tankName(t.target) }}</td>
+              <td>{{ deviceLabel(t.device) }}</td>
+              <td>{{ formatLiters(t.target_liters) }}</td>
+              <td>{{ formatLiters(t.accumulated_liters) }}</td>
+              <td>
+                <span class="status-tag" :class="transferStatusClass(t.status)">{{ transferStatusText(t.status) }}</span>
+                <span v-if="t.status === 'failed' && t.fail_reason" class="fail-reason">{{ failReasonText(t.fail_reason) }}</span>
+              </td>
+              <td>
+                <el-button size="mini" type="text" style="color: #f56c6c;" :disabled="t.status === 'running'" @click="removeTransferTask(t)">删除</el-button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else style="text-align: center; color: #909399; padding: 20px; font-size: 12px;">
+        暂无输送任务记录
       </div>
     </div>
 
@@ -455,34 +353,13 @@
 </template>
 
 <script>
-import { SENSOR_DEFS, fetchSensorFields, fieldsToSensorItems, fieldsToDeviceItems, reconcileByBackend } from '../utils/sensors'
+import { fetchSensorFields, fieldsToDeviceItems, reconcileByBackend } from '../utils/sensors'
 import { unwrapData } from '../utils/request'
 
 export default {
-  name: 'WaterHome',
+  name: 'ControlPage',
   data() {
     return {
-      // 水槽列表（本地持久化，支持增删）
-      tankList: [
-        { id: '1', name: '水槽 01', status: '正常' },
-        { id: '2', name: '水槽 02', status: '正常' }
-      ],
-      addTankDialogVisible: false,
-      addTankForm: { name: '', defaultName: '水槽 01' },
-      // 实时传感数据展示项（本地持久化，支持增删改名称/单位）
-      sensorItems: SENSOR_DEFS.map(s => ({ key: s.key, label: s.label, unit: s.unit })),
-      sensorEditVisible: false,
-      editSensorItems: [],
-      // 用户显式删除过的传感字段（黑名单），避免刷新后被后端/数据自动加回
-      deletedSensorKeys: [],
-      // 实时传感数据
-      sensorData: {
-        timestamp: '--',
-        temp1: 0,
-        temp2: 0,
-        pressure: 0,
-        flow: 0
-      },
       // 设备状态（动态：key 为设备字段名，value 0/1）
       deviceStatus: {},
       // 设备控制项（本地持久化，支持增删改；key 对应后端执行器字段）
@@ -493,13 +370,8 @@ export default {
       deviceEditVisible: false,
       editDevices: [],
       deletedDeviceKeys: [],
-      // 智能判定结果
-      judgeResult: {
-        time: '--',
-        status: 'normal',
-        message: '等待数据...',
-        action: 'none'
-      },
+      // 实时传感数据（仅用于 device/status 不可用时的执行器字段兜底）
+      sensorData: {},
       timer: null,
       polling: false, // 轮询防重入锁：上一次请求未返回时不重复发起
       // 自动/手动控制模式：auto=系统自动控制设备；manual=用户手动控制
@@ -521,33 +393,24 @@ export default {
       transferNextId: 1,
       activeTransfer: null, // 进行中的定流量输送任务（后端 /auto-transfer 返回）
       transferTimer: null,
+      transferHistory: [], // 定流量输送任务记录（后端 /auto-transfer 列表）
 
-      // ===== 预计时间/温度 =====
-      predictField: 'temp1', // 当前推算的温度字段
-      predictRateInput: null, // 手动填写的温度变化速率(℃/分)，null 表示用自动推算
-      predictRateAuto: null, // 近 15 分钟历史数据加权回归出的速率(℃/分)
-      predictTarget: null, // 目标温度输入
-      predictMinutes: null, // 分钟数输入
-      predictHistoryLoading: false,
-      predictTimer: null
+      // 水槽列表（只读副本，用于定流量输送的水槽名称展示，增删在「实时监测」页）
+      tankList: [
+        { id: '1', name: '水槽 01', status: '正常' },
+        { id: '2', name: '水槽 02', status: '正常' }
+      ]
     }
   },
   created() {
     this.loadTankList()
-    this.loadSensorItems()
-    this.loadDeletedSensorKeys()
     this.loadDevices()
     this.loadDeletedDeviceKeys()
     this.loadControlMode()
     this.loadSchedules()
     this.loadTransferPaths()
-    // 确保默认温度字段有效（用户可能已删除 temp1）
-    if (!this.temperatureFields.some(s => s.key === this.predictField)) {
-      this.predictField = this.temperatureFields.length ? this.temperatureFields[0].key : 'temp1'
-    }
   },
   mounted() {
-    this.initSensorFields()
     this.initDevices()
     this.fetchSystemConfig()
     this.pollData()
@@ -555,14 +418,10 @@ export default {
     this.timer = setInterval(() => this.pollData(), 3000)
     // 每秒检查一次定时任务（时间已精确到秒）
     this.scheduleTimer = setInterval(() => this.checkSchedules(), 1000)
-    // 预计时间/温度：初始推算一次速率，之后每 60 秒刷新
-    this.fetchPredictRate()
-    this.predictTimer = setInterval(() => this.fetchPredictRate(), 60000)
     // 定流量输送：每 2 秒轮询一次运行中任务的进度
     this.transferTimer = setInterval(() => this.pollActiveTransfer(), 2000)
-    // 初始化添加水槽表单默认名
-    const nextId = Math.max(0, ...this.tankList.map(t => Number(t.id))) + 1
-    this.addTankForm.defaultName = '水槽 ' + String(nextId).padStart(2, '0')
+    // 加载定流量输送任务记录，并恢复页面刷新前遗留的「运行中」任务进度
+    this.fetchTransferHistory()
   },
   beforeDestroy() {
     if (this.timer) {
@@ -571,41 +430,11 @@ export default {
     if (this.scheduleTimer) {
       clearInterval(this.scheduleTimer)
     }
-    if (this.predictTimer) {
-      clearInterval(this.predictTimer)
-    }
     if (this.transferTimer) {
       clearInterval(this.transferTimer)
     }
   },
   computed: {
-    // 运行中的执行器数量（deviceStatus 值为 1 视为运行中）
-    runningDeviceCount() {
-      return this.devices.filter(d => {
-        const v = this.deviceStatus[d.key]
-        return v === 1 || v === '1' || v === true
-      }).length
-    },
-    // 系统整体状态是否正常（来自智能判定结果，无数据时默认正常）
-    isSystemNormal() {
-      const s = this.judgeResult && this.judgeResult.status
-      return s === 'normal' || s === undefined || s === null || s === '' || s === '--'
-    },
-    // 温度字段（单位含 ℃ 或字段名含 temp），无匹配时回退全部传感字段
-    temperatureFields() {
-      const list = this.sensorItems.filter(s => (s.unit || '').indexOf('℃') >= 0 || /temp/i.test(s.key))
-      return list.length ? list : this.sensorItems
-    },
-    // 传感器卡片图标映射
-    sensorIcon() {
-      return (key) => {
-        if (/temp/i.test(key)) return 'temperature'
-        if (/pressure/i.test(key)) return 'pressure'
-        if (/flow/i.test(key)) return 'flow'
-        if (/level|water|液位|水位/i.test(key)) return 'level-warn'
-        return 'droplet'
-      }
-    },
     // 执行器/设备图标映射
     deviceIcon() {
       return (key) => {
@@ -613,56 +442,6 @@ export default {
         if (/heat/i.test(key)) return 'heater'
         return 'setup'
       }
-    },
-    // 当前温度数值（解析失败返回 null）
-    predictCurrent() {
-      const n = Number(this.sensorData[this.predictField])
-      return isNaN(n) ? null : n
-    },
-    predictCurrentText() {
-      return this.predictCurrent === null ? '--' : this.predictCurrent + ' ℃'
-    },
-    // 是否手动填写了速率（否则用自动推算）
-    isManualRate() {
-      return this.predictRateInput !== null && this.predictRateInput !== undefined && this.predictRateInput !== ''
-    },
-    // 生效的速率：手动优先，否则自动；无数据返回 null
-    predictRate() {
-      if (this.isManualRate) {
-        const n = Number(this.predictRateInput)
-        return isNaN(n) ? null : n
-      }
-      return this.predictRateAuto
-    },
-    predictRateText() {
-      const r = this.predictRate
-      if (r === null || r === undefined) return '暂无'
-      const v = parseFloat(r.toFixed(4))
-      return (v > 0 ? '+' : '') + v + ' ℃/分'
-    },
-    // 目标温度 → 预计分钟数
-    predictTimeText() {
-      if (this.predictCurrent === null) return '等待实时温度数据…'
-      const target = Number(this.predictTarget)
-      if (this.predictTarget === null || this.predictTarget === undefined || isNaN(target)) return '请输入目标温度'
-      const rate = this.predictRate
-      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
-      if (Math.abs(rate) < 1e-9) {
-        return target === this.predictCurrent ? '当前已达标' : '速率接近 0，无法估算'
-      }
-      const minutes = (target - this.predictCurrent) / rate
-      if (minutes < 0) return '按当前速率无法达到该温度'
-      return '预计 ' + this.formatPredictDuration(minutes)
-    },
-    // 分钟数 → 预计温度
-    predictTempText() {
-      if (this.predictCurrent === null) return '等待实时温度数据…'
-      const minutes = Number(this.predictMinutes)
-      if (this.predictMinutes === null || this.predictMinutes === undefined || isNaN(minutes)) return '请输入分钟数'
-      const rate = this.predictRate
-      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
-      const temp = this.predictCurrent + rate * minutes
-      return '预计 ' + temp.toFixed(1) + ' ℃'
     },
     // 定流量输送可选的水泵（仅泵类执行器，避免把加热器等混入）
     pumpDevices() {
@@ -679,96 +458,6 @@ export default {
     }
   },
   methods: {
-    goToDetail(id) {
-      this.$router.push({ name: 'TankDetail', params: { id: id } })
-    },
-
-    // ===== 水槽增删 =====
-    loadTankList() {
-      try {
-        const raw = localStorage.getItem('iot_water_tanks')
-        if (raw) {
-          const arr = JSON.parse(raw)
-          if (Array.isArray(arr) && arr.length) this.tankList = arr
-        }
-      } catch (e) { /* 本地数据解析失败时使用默认值 */ }
-    },
-    saveTankList() {
-      localStorage.setItem('iot_water_tanks', JSON.stringify(this.tankList))
-    },
-    openAddTankDialog() {
-      this.addTankForm.name = ''
-      this.addTankDialogVisible = true
-    },
-    confirmAddTank() {
-      const name = (this.addTankForm.name && this.addTankForm.name.trim()) || this.addTankForm.defaultName
-      const nextId = Math.max(0, ...this.tankList.map(t => Number(t.id))) + 1
-      this.tankList.push({ id: String(nextId), name, status: '正常' })
-      this.saveTankList()
-      this.addTankDialogVisible = false
-      this.$message.success('已添加 ' + name)
-    },
-    removeTank(tank) {
-      this.$confirm(`确定删除「${tank.name}」吗？`, '提示', { type: 'warning' })
-        .then(() => {
-          this.tankList = this.tankList.filter(t => t.id !== tank.id)
-          this.saveTankList()
-          this.$message.success('已删除')
-        }).catch(() => {})
-    },
-
-    // ===== 传感数据名称/单位增删改 =====
-    loadSensorItems() {
-      try {
-        const raw = localStorage.getItem('iot_water_sensors')
-        if (raw) {
-          const arr = JSON.parse(raw)
-          if (Array.isArray(arr) && arr.length) this.sensorItems = arr
-        }
-      } catch (e) { /* 本地数据解析失败时使用默认值 */ }
-    },
-    loadDeletedSensorKeys() {
-      try {
-        const raw = localStorage.getItem('iot_water_sensor_deleted')
-        if (raw) {
-          const arr = JSON.parse(raw)
-          if (Array.isArray(arr)) this.deletedSensorKeys = arr
-        }
-      } catch (e) { /* 忽略 */ }
-    },
-    saveSensorItemsToStorage() {
-      localStorage.setItem('iot_water_sensors', JSON.stringify(this.sensorItems))
-    },
-    openSensorEdit() {
-      this.editSensorItems = this.sensorItems.map(s => ({ ...s }))
-      this.sensorEditVisible = true
-    },
-    addSensorItem() {
-      this.editSensorItems.push({ key: '', label: '', unit: '' })
-    },
-    removeSensorItem(index) {
-      this.editSensorItems.splice(index, 1)
-    },
-    saveSensorItems() {
-      const newItems = this.editSensorItems
-        .filter(s => s.key && s.key.trim() && s.label && s.label.trim())
-        .map(s => ({ key: s.key.trim(), label: s.label.trim(), unit: (s.unit || '').trim() }))
-      // 同步删除黑名单：被用户删掉的字段记录下来，刷新后不再被后端/数据自动加回
-      const oldKeys = new Set(this.sensorItems.map(s => s.key))
-      const newKeys = new Set(newItems.map(s => s.key))
-      const del = new Set(this.deletedSensorKeys)
-      oldKeys.forEach(k => { if (!newKeys.has(k)) del.add(k) })
-      newKeys.forEach(k => del.delete(k))
-      this.deletedSensorKeys = Array.from(del)
-      localStorage.setItem('iot_water_sensor_deleted', JSON.stringify(this.deletedSensorKeys))
-      this.sensorItems = newItems
-      this.saveSensorItemsToStorage()
-      this.sensorEditVisible = false
-      this.$message.success('传感数据配置已保存')
-      // 同步到后端元数据（新增/更新），后台静默执行，失败不影响本地保存
-      this.syncSensorMetaToBackend()
-    },
-
     // ===== 设备控制（动态）增删改 =====
     loadDevices() {
       try {
@@ -803,9 +492,8 @@ export default {
       // 同步到后端配置，后端据此决定是否自动控制；失败不影响本地状态
       this.$http.post('/config/save', { control_mode: mode }).catch(() => {})
       this.$message.success(mode === 'auto' ? '已切换为自动模式' : '已切换为手动模式')
-      // 切回自动模式时，重新拉取系统判定和设备状态，让自动控制立即生效
+      // 切回自动模式时，重新拉取设备状态，让自动控制立即生效
       if (mode === 'auto') {
-        this.fetchJudgeResult()
         this.fetchDeviceStatus()
       }
     },
@@ -813,9 +501,7 @@ export default {
     async fetchSystemConfig() {
       try {
         let res = await this.$http.get('/config/all')
-        // 解包 {code, data} 包裹
         res = unwrapData(res)
-        // 归一化为 { key: value }，兼容数组 [{key,value}] 与扁平对象两种返回
         let map = null
         if (Array.isArray(res)) {
           map = {}
@@ -847,8 +533,7 @@ export default {
       const apiItems = fieldsToDeviceItems(fields) || []
       if (!apiItems.length) return
       // 以后端元数据为唯一权威来源：仅保留后端当前登记为 actuator 的字段，
-      // 剔除本地遗留的 pump2/heater2 等后端控制接口不支持的字段，避免下发控制 400。
-      // 以后端元数据为权威：后端已删除的设备剔除，新增的补入，用户改过的名称保留
+      // 自动补入后端新增的执行器（如 pump2），剔除后端已移除的本地遗留字段，避免下发控制 400。
       this.devices = reconcileByBackend(this.devices, apiItems, this.deletedDeviceKeys)
       this.saveDevicesToStorage()
     },
@@ -881,25 +566,6 @@ export default {
       // 同步到后端元数据（新增/更新），后台静默执行，失败不影响本地保存
       this.syncDeviceMetaToBackend()
     },
-    // 同步传感器元数据到后端（新增/更新；删除的字段禁用）
-    async syncSensorMetaToBackend() {
-      for (const item of this.sensorItems) {
-        try {
-          await this.$http.post('/sensor/meta', {
-            field_name: item.key,
-            display_name: item.label,
-            unit: item.unit || '',
-            data_type: 'number',
-            category: 'sensor'
-          })
-        } catch (e) { /* 后端不可用，忽略 */ }
-      }
-      for (const key of this.deletedSensorKeys) {
-        try {
-          await this.$http.delete(`/sensor/meta/${key}`)
-        } catch (e) { /* 忽略 */ }
-      }
-    },
     // 同步设备（执行器）元数据到后端（新增/更新；删除的字段禁用）
     async syncDeviceMetaToBackend() {
       for (const d of this.devices) {
@@ -920,26 +586,14 @@ export default {
       }
     },
 
-    // 从后端 API 加载传感器元数据，更新 sensorItems
-    async initSensorFields() {
-      const fields = await fetchSensorFields(this.$http)
-      if (!fields) return
-      const items = fieldsToSensorItems(fields)
-      if (!items || !items.length) return
-      // 以后端元数据为权威：后端已删除的字段剔除，新增的补入，用户改过的名称/单位保留
-      this.sensorItems = reconcileByBackend(this.sensorItems, items, this.deletedSensorKeys)
-      this.saveSensorItemsToStorage()
-    },
-
-    // 统一轮询入口：并发请求三组实时数据，带防重入锁，避免弱网下请求叠加导致不稳定
+    // 统一轮询入口：并发请求实时数据与设备状态，带防重入锁
     async pollData() {
       if (this.polling) return
       this.polling = true
       try {
         await Promise.all([
           this.fetchRealTimeData(),
-          this.fetchDeviceStatus(),
-          this.fetchJudgeResult()
+          this.fetchDeviceStatus()
         ])
       } finally {
         this.polling = false
@@ -953,7 +607,6 @@ export default {
         if (res) {
           this.sensorData = { ...this.sensorData, ...res }
           this.updateOnline(res.timestamp)
-          // 字段列表以后端元数据为权威，不再从实时数据自动发现（避免后端已软删的字段被加回）
         }
       } catch (error) {
         this.online = false // 后端不可达视为离线
@@ -975,31 +628,6 @@ export default {
         const status = {}
         this.devices.forEach(d => { status[d.key] = this.sensorData[d.key] ?? 0 })
         this.deviceStatus = status
-      }
-    },
-
-    async fetchJudgeResult() {
-      try {
-        let res = await this.$http.get('/monitor/judge/latest')
-        res = unwrapData(res)
-        if (res) this.applyJudgeResult(res)
-      } catch (error) {
-        // 后端可能只有 /monitor/judge 而无 /judge/latest，回退再试一次
-        try {
-          let res = await this.$http.get('/monitor/judge')
-          res = unwrapData(res)
-          if (res) this.applyJudgeResult(res)
-        } catch (e) {
-          console.error('获取判定结果失败', e)
-        }
-      }
-    },
-    applyJudgeResult(res) {
-      this.judgeResult = {
-        time: res.time || '--',
-        status: res.status || 'normal',
-        message: this.judgeStatusText(res.status),
-        action: res.action || 'none'
       }
     },
 
@@ -1026,6 +654,12 @@ export default {
         }
       } catch (error) {
         const status = error && error.response && error.response.status
+        const data = error && error.response && error.response.data
+        // 定流量任务占用保护：HTTP 409（code=2）
+        if (status === 409) {
+          this.$message.error((data && data.msg) || '该设备正被定流量任务占用，请先停止输送任务')
+          return
+        }
         const msg = status
           ? `控制失败（后端返回 ${status}）`
           : '控制请求失败，请检查后端是否启动及网络是否连通'
@@ -1050,6 +684,13 @@ export default {
           this.$message.error(res.msg || '控制失败')
         }
       } catch (error) {
+        const status = error && error.response && error.response.status
+        const data = error && error.response && error.response.data
+        // 定时任务碰到定流量任务占用（HTTP 409）时给出明确提示
+        if (status === 409) {
+          this.$message.error((data && data.msg) || '该设备正被定流量任务占用，定时任务未执行')
+          return
+        }
         this.$message.error('定时任务执行失败')
       }
     },
@@ -1213,6 +854,17 @@ export default {
       })
     },
 
+    // ===== 水槽列表（只读副本） =====
+    loadTankList() {
+      try {
+        const raw = localStorage.getItem('iot_water_tanks')
+        if (raw) {
+          const arr = JSON.parse(raw)
+          if (Array.isArray(arr) && arr.length) this.tankList = arr
+        }
+      } catch (e) { /* 本地数据解析失败时使用默认值 */ }
+    },
+
     // ===== 定流量输送 =====
     // 水槽 id → 显示名
     tankName(id) {
@@ -1299,7 +951,19 @@ export default {
           this.$message.error('启动失败，请确认后端已实现 /auto-transfer 接口')
         }
       } catch (error) {
-        this.$message.error('启动输送失败：请确认后端已实现定流量输送接口')
+        const status = error && error.response && error.response.status
+        const data = error && error.response && error.response.data
+        // 已有进行中的任务：HTTP 409（code=2）
+        if (status === 409) {
+          this.$message.error((data && data.msg) || '已有进行中的输送任务，请先停止后再创建')
+          return
+        }
+        // 开泵指令下发失败：HTTP 500（code=3）
+        if (status === 500 && data && data.msg) {
+          this.$message.error(data.msg)
+          return
+        }
+        this.$message.error((data && data.msg) || '启动输送失败，请检查后端是否已实现定流量输送接口')
         console.error('startTransfer 失败：', error)
       }
     },
@@ -1314,11 +978,15 @@ export default {
         if (task.status === 'done') {
           this.activeTransfer = null
           this.$alert('定流量任务已完成', '提示', { type: 'success', confirmButtonText: '确定' }).catch(() => {})
+          this.fetchTransferHistory()
         } else if (task.status === 'failed') {
           this.activeTransfer = null
-          this.$message.error('定流量输送任务异常终止')
+          const reason = this.failReasonText(task.fail_reason)
+          this.$message.error(reason ? ('定流量输送任务异常终止：' + reason) : '定流量输送任务异常终止')
+          this.fetchTransferHistory()
         } else if (task.status === 'stopped') {
           this.activeTransfer = null
+          this.fetchTransferHistory()
         }
       } catch (e) {
         // 轮询失败静默忽略，避免频繁弹错误提示
@@ -1332,9 +1000,69 @@ export default {
       try {
         await this.$http.post('/auto-transfer/' + id + '/stop')
         this.$message.success('已停止输送')
+        this.fetchTransferHistory()
       } catch (e) {
-        this.$message.error('停止失败，请确认后端已实现停止接口')
+        const data = e && e.response && e.response.data
+        this.$message.error((data && data.msg) || '停止失败，请确认后端已实现停止接口')
       }
+    },
+
+    // 获取定流量输送任务记录（列表接口无 msg，返回 {code,total,page,page_size,data}）
+    async fetchTransferHistory() {
+      try {
+        let res = await this.$http.get('/auto-transfer', { params: { page: 1, page_size: 20 } })
+        res = unwrapData(res)
+        const list = (res && Array.isArray(res.data)) ? res.data : []
+        this.transferHistory = list
+        // 页面刷新/切页后，若后端仍有「运行中」任务，恢复进度展示
+        const running = list.find(t => t.status === 'running')
+        if (running && (!this.activeTransfer || this.activeTransfer.id !== running.id)) {
+          this.activeTransfer = { ...running }
+        }
+      } catch (e) {
+        console.error('获取输送任务记录失败', e)
+      }
+    },
+
+    // 删除定流量输送任务记录（运行中的任务后端会拒绝删除，需先停止）
+    async removeTransferTask(task) {
+      if (!task || task.id === undefined) return
+      this.$confirm('确定删除该任务记录？', '提示', { type: 'warning' })
+        .then(async () => {
+          try {
+            await this.$http.delete('/auto-transfer/' + task.id)
+            this.$message.success('已删除')
+            this.fetchTransferHistory()
+          } catch (e) {
+            const status = e && e.response && e.response.status
+            const data = e && e.response && e.response.data
+            if (status === 400 && data && data.msg) {
+              this.$message.error(data.msg)
+              return
+            }
+            this.$message.error(status === 404 ? '任务不存在' : '删除失败')
+          }
+        }).catch(() => {})
+    },
+
+    // 定流量任务状态 → 中文
+    transferStatusText(status) {
+      const map = { running: '运行中', done: '已完成', stopped: '已停止', failed: '失败' }
+      return map[status] || status || '-'
+    },
+    transferStatusClass(status) {
+      const map = { running: 'status-normal', done: 'status-normal', stopped: 'status-warn', failed: 'status-danger' }
+      return map[status] || 'status-warn'
+    },
+    // 定流量任务失败原因 → 中文
+    failReasonText(reason) {
+      const map = {
+        zero_flow: '零流量/断流',
+        timeout: '超时未达标',
+        send_fail: '开泵指令下发失败',
+        server_restart: '服务重启中断'
+      }
+      return map[reason] || reason || ''
     },
 
     // 撤销上一次手动控制指令
@@ -1354,272 +1082,13 @@ export default {
       } catch (error) {
         this.$message.error('撤销请求失败，请检查后端是否启动')
       }
-    },
-
-    getStatusClass(status) {
-      if (status === 'normal' || status === undefined) return 'status-normal'
-      if (status.includes('low')) return 'status-warn'
-      return 'status-danger'
-    },
-
-    judgeStatusText(status) {
-      const map = {
-        normal: '系统正常',
-        temp_high: '水温过高',
-        temp_low: '水温过低',
-        pressure_abnormal: '压力异常',
-        flow_abnormal: '流量异常',
-        alarm: '存在异常'
-      }
-      return map[status] || status || '等待数据'
-    },
-
-    judgeActionText(action) {
-      if (action === undefined || action === null || action === '' || action === 'none') return '无'
-      // 字典格式：{ pump: 1, heater: 0 } → 「开水泵、关加热器」
-      if (typeof action === 'object' && !Array.isArray(action)) {
-        const parts = Object.keys(action).map(k => {
-          const v = action[k]
-          const name = this.actuatorName(k)
-          if (v === 1 || v === '1' || v === true) return '开' + name
-          if (v === 0 || v === '0' || v === false) return '关' + name
-          return name + '=' + v
-        })
-        return parts.length ? parts.join('、') : JSON.stringify(action)
-      }
-      // 字符串动作（含别名映射，如 heating → heater、emergency_stop 等）
-      const s = String(action).trim()
-      // 新版 action 统一为「执行器:状态」格式，多条用 '; ' 分隔（如 heater:0; pump:0）
-      if (s.includes(':')) {
-        const parts = s.split(';').map(seg => {
-          const idx = seg.indexOf(':')
-          if (idx < 0) return null
-          const f = seg.slice(0, idx).trim()
-          const v = seg.slice(idx + 1).trim()
-          if (!f) return null
-          const name = this.actuatorName(f)
-          if (v === '1') return '开' + name
-          if (v === '0') return '关' + name
-          return name + '=' + v
-        }).filter(Boolean)
-        if (parts.length) return parts.join('、')
-      }
-      const map = {
-        stop_heating: '停止加热',
-        start_heating: '开启加热',
-        stop_pump: '停止水泵',
-        start_pump: '开启水泵',
-        emergency_stop: '紧急停机',
-        keep: '保持当前状态',
-        none: '无'
-      }
-      return map[s] || s
-    },
-
-    // 执行器字段 → 中文名（优先用本地设备列表，兜底常见映射）
-    actuatorName(key) {
-      const d = this.devices.find(x => x.key === key)
-      if (d && d.label) return d.label
-      const map = { pump: '水泵', pump2: '水泵2', pump3: '水泵3', heater: '加热器', heater2: '加热器2' }
-      return map[key] || key
-    },
-
-    judgeConclusionText(status) {
-      const map = {
-        normal: '系统运行正常，各项指标均在安全范围内，无需干预。',
-        temp_high: '水温超过安全上限，建议停止加热并检查温控设备。',
-        temp_low: '水温低于安全下限，建议开启加热以维持温度。',
-        pressure_abnormal: '管道压力异常，建议检查管路并调整水泵运行。',
-        flow_abnormal: '管道流量异常，建议检查水路是否堵塞或泄漏。',
-        alarm: '检测到异常状况，请及时查看报警并处理。'
-      }
-      return map[status] || '暂无判定结论。'
-    },
-
-    // ===== 预计时间/温度 =====
-    onPredictFieldChange() {
-      this.fetchPredictRate()
-    },
-    // 时间戳 → 毫秒（解析失败返回 NaN）
-    parseTime(ts) {
-      if (!ts) return NaN
-      const t = new Date(String(ts).replace(/-/g, '/')).getTime()
-      return isNaN(t) ? NaN : t
-    },
-    // 图表接口返回归一化为点数组 [{timestamp, value}]
-    normalizePoints(res) {
-      let arr = unwrapData(res)
-      if (!Array.isArray(arr) && arr && Array.isArray(arr.data)) arr = arr.data
-      return Array.isArray(arr) ? arr : []
-    },
-    // 时间 → 'YYYY-MM-DD HH:MM:SS'
-    formatDate(date) {
-      const pad = (n) => n < 10 ? '0' + n : n
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    },
-    // 时间加权线性回归斜率（℃/分）：x 为相对首点的分钟数，近期点权重更高（时间衰减 τ=5 分钟），
-    // 使速率更贴近当前变化趋势，而非整段历史平均
-    linearSlope(points) {
-      if (!points || points.length < 2) return null
-      const t0 = points[0].t
-      const tau = 5 * 60 * 1000 // 时间衰减常数 5 分钟
-      let sw = 0, swx = 0, swy = 0, swxy = 0, swx2 = 0
-      points.forEach(p => {
-        const dt = p.t - t0
-        const x = dt / 60000 // 分钟（浮点，保留秒级精度）
-        const y = p.v
-        const w = Math.exp(-dt / tau)
-        sw += w; swx += w * x; swy += w * y; swxy += w * x * y; swx2 += w * x * x
-      })
-      const denom = sw * swx2 - swx * swx
-      if (Math.abs(denom) < 1e-9) return null
-      return (sw * swxy - swx * swy) / denom
-    },
-    // 拉取近 15 分钟温度历史，加权线性回归推算变化速率(℃/分)
-    async fetchPredictRate() {
-      if (this.predictHistoryLoading) return
-      this.predictHistoryLoading = true
-      try {
-        const field = this.predictField
-        const end = new Date()
-        const start = new Date(end.getTime() - 15 * 60 * 1000)
-        const res = await this.$http.get('/records/sensor/chart', {
-          params: { sensor_type: field, start_time: this.formatDate(start), end_time: this.formatDate(end) }
-        })
-        const points = this.normalizePoints(res)
-          .map(p => ({ t: this.parseTime(p.timestamp), v: Number(p.value) }))
-          .filter(p => !isNaN(p.t) && !isNaN(p.v))
-          .sort((a, b) => a.t - b.t)
-        this.predictRateAuto = this.linearSlope(points)
-      } catch (e) {
-        this.predictRateAuto = null
-      } finally {
-        this.predictHistoryLoading = false
-      }
-    },
-    // 分钟数 → 可读时长文案（精确到秒）
-    formatPredictDuration(mins) {
-      if (!isFinite(mins)) return '--'
-      const totalSeconds = Math.round(mins * 60)
-      if (totalSeconds < 60) return totalSeconds + ' 秒'
-      const h = Math.floor(totalSeconds / 3600)
-      const m = Math.floor((totalSeconds % 3600) / 60)
-      const s = totalSeconds % 60
-      if (h > 0) return h + ' 小时 ' + m + ' 分 ' + s + ' 秒'
-      return m + ' 分 ' + s + ' 秒'
-    },
-
+    }
   }
 }
 </script>
 
 
 <style scoped>
-/* 水槽列表样式 */
-.tank-list {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.tank-card {
-  position: relative;
-  flex: 1;
-  min-width: 120px;
-  background: #ffffff;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-}
-
-.tank-card:hover {
-  border-color: #14b8a6;
-  background: #f0fdfa;
-}
-
-.tank-delete {
-  position: absolute;
-  top: 6px;
-  right: 10px;
-  color: #c0c4cc;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.tank-delete:hover {
-  color: #f56c6c;
-}
-
-.tank-icon {
-  font-size: 26px;
-  margin-bottom: 8px;
-}
-
-.tank-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 6px;
-}
-
-.tank-running {
-  font-size: 12px;
-  color: #606266;
-  margin-bottom: 6px;
-}
-
-.tank-status {
-  font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 10px;
-  display: inline-block;
-  background: rgba(103, 194, 58, 0.1);
-}
-
-.tank-status.status-danger {
-  background: rgba(245, 108, 108, 0.1);
-}
-
-/* 实时数据网格布局 */
-.data-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.data-item {
-  background: #f5f7fa;
-  padding: 14px 12px;
-  border-radius: 12px;
-  text-align: center;
-  border: 1px solid #f0f2f5;
-}
-
-.data-label {
-  color: #909399;
-  font-size: 12px;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.data-value {
-  color: #14b8a6;
-  font-size: 22px;
-  font-weight: bold;
-}
-
-.data-value .unit {
-  font-style: normal;
-  font-size: 12px;
-  color: #909399;
-  font-weight: normal;
-}
-
 /* 设备控制布局 */
 .control-grid {
   display: grid;
@@ -1728,40 +1197,7 @@ export default {
   flex-shrink: 0;
 }
 
-/* 智能判定样式 */
-.judge-result {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.judge-row {
-  display: flex;
-  align-items: center;
-  background: #f5f7fa;
-  padding: 12px;
-  border-radius: 10px;
-}
-
-.judge-row .data-label {
-  flex-shrink: 0;
-  display: inline-block;
-  margin-bottom: 0;
-  margin-right: 8px;
-  color: #606266;
-}
-
-.judge-action {
-  color: #303133;
-  font-weight: 600;
-}
-
-.judge-conclusion {
-  color: #606266;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
+/* 状态标签 */
 .status-tag {
   padding: 3px 12px;
   border-radius: 12px;
@@ -1791,7 +1227,7 @@ export default {
   font-weight: normal;
 }
 
-/* 编辑传感数据弹窗 */
+/* 编辑设备弹窗（复用传感编辑样式） */
 .sensor-edit-list {
   display: flex;
   flex-direction: column;
@@ -1805,78 +1241,6 @@ export default {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-}
-
-/* 预计时间/温度 */
-.predict-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.predict-label {
-  font-size: 12px;
-  color: #909399;
-}
-
-.predict-current {
-  font-size: 20px;
-  font-weight: bold;
-  color: #14b8a6;
-}
-
-.predict-rate {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #909399;
-  margin-left: auto;
-}
-
-.predict-hint {
-  font-size: 12px;
-  color: #909399;
-  margin: 6px 0 12px;
-}
-
-.predict-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.predict-item {
-  background: #f5f7fa;
-  border: 1px solid #f0f2f5;
-  border-radius: 12px;
-  padding: 14px 12px;
-}
-
-.predict-item-label {
-  font-size: 12px;
-  color: #606266;
-  margin-bottom: 8px;
-}
-
-.predict-input-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.predict-unit {
-  font-size: 12px;
-  color: #909399;
-  flex-shrink: 0;
-}
-
-.predict-result {
-  margin-top: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #14b8a6;
 }
 
 /* ===== 定流量输送 ===== */
@@ -1954,6 +1318,13 @@ export default {
   margin-top: 10px;
 }
 
+/* 输送任务失败原因 */
+.fail-reason {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #f56c6c;
+}
+
 /* ===== 响应式：手机端显示卡片，隐藏网格/表格 ===== */
 .mobile-only { display: none; }
 .desktop-only { display: block; }
@@ -1961,12 +1332,6 @@ export default {
 @media (max-width: 640px) {
   .desktop-only { display: none !important; }
   .mobile-only { display: block !important; }
-
-  /* 监测单元列表：手机端一行一个水槽卡片 */
-  .tank-card {
-    flex-basis: 100%;
-    min-width: 100%;
-  }
 
   .card-title {
     flex-wrap: wrap;
@@ -2004,39 +1369,6 @@ export default {
     margin-top: 4px;
   }
 
-  /* 传感器卡片 */
-  .sensor-card {
-    background: #f5f7fa;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 10px;
-  }
-  .sensor-card-header {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-  .sensor-card-icon {
-    color: var(--primary);
-  }
-  .sensor-card-label {
-    font-size: 13px;
-    color: var(--text-2);
-  }
-  .sensor-card-unit {
-    font-size: 12px;
-    color: var(--text-3);
-  }
-  .sensor-card-value {
-    font-size: 22px;
-    font-weight: bold;
-    color: var(--primary);
-    margin-bottom: 6px;
-  }
-
   /* 控制卡片 */
   .control-card {
     background: #f5f7fa;
@@ -2069,16 +1401,7 @@ export default {
     width: 100%;
   }
 
-  /* 预计时间/温度：手机端两列改单列 */
-  .predict-grid {
-    grid-template-columns: 1fr;
-  }
-  .predict-rate {
-    margin-left: 0;
-    width: 100%;
-  }
-
-  /* 定时任务卡片 */
+  /* 定时任务卡片 / 输送路径卡片 */
   .schedule-card {
     background: #f5f7fa;
     border: 1px solid var(--border);
@@ -2124,11 +1447,6 @@ export default {
     align-self: center;
     transform: rotate(90deg);
     padding: 0;
-  }
-
-  /* 弹窗全宽 */
-  .el-dialog {
-    width: 94% !important;
   }
 }
 </style>

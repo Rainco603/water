@@ -1,27 +1,28 @@
 <template>
   <div class="config-page">
 
-    <!-- 0. 后端服务地址（比赛现场换网时修改，无需重新打包） -->
+    <!-- 智能判定结果（实时展示） -->
     <div class="card-box">
-      <div class="card-title">
-        后端服务地址
-        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="resetApiBase"><svg-icon name="refresh" :size="14"/>恢复默认</el-button>
+      <div class="card-title">智能判定结果 <span class="time">{{ judgeResult.time }}</span></div>
+      <div class="judge-result">
+        <div class="judge-row">
+          <span class="data-label">系统运行状态：</span>
+          <span class="status-tag" :class="getStatusClass(judgeResult.status)">
+            {{ judgeResult.message || '等待数据...' }}
+          </span>
+        </div>
+        <div class="judge-row">
+          <span class="data-label">建议动作：</span>
+          <span class="judge-action">{{ judgeActionText(judgeResult.action) }}</span>
+        </div>
+        <div class="judge-row">
+          <span class="data-label">判定结论：</span>
+          <span class="judge-conclusion">{{ judgeConclusionText(judgeResult.status) }}</span>
+        </div>
       </div>
-      <div class="config-row">
-        <span class="c-label">当前地址：</span>
-        <el-input v-model="currentApiBase" size="mini" placeholder="如 http://192.168.1.100:5001" style="flex: 1; min-width: 160px;"></el-input>
-        <el-button type="primary" size="mini" @click="saveApiBase">应用地址</el-button>
-      </div>
-      <el-alert
-        title="比赛现场若更换网络，请输入后端电脑的 IPv4 地址后点击「应用地址」，页面将自动刷新重连，APK 无需重新打包。"
-        type="info"
-        :closable="false"
-        show-icon
-        style="margin-top: 12px;"
-      ></el-alert>
     </div>
 
-    <!-- 1. 智能判定设置 (2-1) -->
+    <!-- 智能判定设置 -->
     <div class="card-box">
       <div class="card-title">智能判定设置</div>
       <div class="judge-config">
@@ -42,33 +43,7 @@
       </div>
     </div>
 
-    <!-- 2.5 数据源配置（串口 / TCP） -->
-    <div class="card-box">
-      <div class="card-title">数据源配置</div>
-      <div class="config-row">
-        <span class="c-label">数据源类型:</span>
-        <el-select v-model="dataSourceConfig.data_source" size="mini" style="width: 160px;">
-          <el-option label="串口" value="serial"></el-option>
-          <el-option label="TCP 客户端" value="tcp_client"></el-option>
-          <el-option label="TCP 服务端" value="tcp_server"></el-option>
-        </el-select>
-      </div>
-      <div class="config-row" v-if="dataSourceConfig.data_source !== 'serial'">
-        <span class="c-label">TCP 主机:</span>
-        <el-input v-model="dataSourceConfig.tcp_host" size="mini" style="width: 200px;"></el-input>
-        <span class="c-label" style="margin-left: 10px;">端口:</span>
-        <el-input v-model="dataSourceConfig.tcp_port" size="mini" style="width: 100px;"></el-input>
-      </div>
-      <div class="config-row">
-        <span class="c-label">心跳超时(秒):</span>
-        <el-input-number v-model="dataSourceConfig.heartbeat_timeout" size="mini" :min="1" :max="3600" :step="5"></el-input-number>
-      </div>
-      <div style="text-align: center; margin-top: 15px;">
-        <el-button type="primary" size="mini" @click="saveDataSourceConfig">保存数据源配置</el-button>
-      </div>
-    </div>
-
-    <!-- 3. 规则引擎配置 -->
+    <!-- 规则引擎配置 -->
     <div class="card-box">
       <div class="card-title">
         安全联锁配置（温度闭环）
@@ -151,7 +126,7 @@
       </div>
     </div>
 
-    <!-- 4. 判定记录查询 (2-3) -->
+    <!-- 判定记录查询 -->
     <div class="card-box">
       <div class="card-title">判定记录查询<span class="count" v-if="judgeQueried">（共 {{ total }} 条）</span></div>
       <div class="filter-form">
@@ -228,116 +203,6 @@
       </div>
     </div>
 
-    <!-- 4. 操作日志查询 -->
-    <div class="card-box">
-      <div class="card-title">操作日志查询<span class="count" v-if="opLogQueried">（共 {{ opLogTotal }} 条）</span></div>
-      <div class="filter-form">
-        <div class="form-item">
-          <span class="label">设备标识:</span>
-          <el-input v-model="opLogFilterData.deviceId" size="mini" clearable placeholder="如 pump / heater" style="width: 140px;"></el-input>
-        </div>
-        <div class="form-item">
-          <span class="label">日志类型:</span>
-          <el-select v-model="opLogFilterData.logType" size="mini" clearable filterable allow-create placeholder="全部" style="width: 130px;">
-            <el-option v-for="t in logTypeOptions" :key="t" :label="t" :value="t"></el-option>
-          </el-select>
-        </div>
-        <div class="form-item">
-          <span class="label">操作类型:</span>
-          <el-select v-model="opLogFilterData.operationType" size="mini" clearable filterable allow-create placeholder="全部" style="width: 130px;">
-            <el-option v-for="t in operationTypeOptions" :key="t" :label="t" :value="t"></el-option>
-          </el-select>
-        </div>
-        <div class="form-item">
-          <span class="label">快捷时间:</span>
-          <el-select v-model="opLogFilterData.quickRange" size="mini" style="width: 130px">
-            <el-option label="自定义" value="custom"></el-option>
-            <el-option label="最近15分钟" value="15m"></el-option>
-            <el-option label="最近30分钟" value="30m"></el-option>
-            <el-option label="最近1小时" value="1h"></el-option>
-          </el-select>
-        </div>
-        <div class="form-item time-range-item" v-show="opLogFilterData.quickRange === 'custom'">
-          <span class="label">时间范围:</span>
-          <roll-time-range-picker v-model="opLogFilterData.timeRange"></roll-time-range-picker>
-        </div>
-        <el-button type="primary" size="mini" @click="handleOpLogQuery">查 询</el-button>
-      </div>
-
-      <!-- 展开行表格，点击查看变更前后值 JSON -->
-      <div class="table-scroll">
-        <table class="custom-table" style="margin-top: 15px;">
-          <thead>
-            <tr>
-              <th width="160">时间</th>
-              <th width="100">设备标识</th>
-              <th width="90">日志类型</th>
-              <th width="90">操作类型</th>
-              <th>内容摘要 (点击行查看详情)</th>
-            </tr>
-          </thead>
-          <tbody v-for="(item, index) in opLogList" :key="index">
-            <tr @click="toggleOpLogExpand(index)" class="clickable-row">
-              <td>{{ item.time || item.timestamp }}</td>
-              <td>{{ item.device_id || item.deviceId || '-' }}</td>
-              <td>{{ item.log_type || item.logType || '-' }}</td>
-              <td>{{ item.operation_type || item.operationType || '-' }}</td>
-              <td>
-                {{ opLogSummary(item) }}
-                <svg-icon :name="expandedOpLogRows.includes(index) ? 'arrow-up' : 'arrow-down'" :size="14" style="margin-left: 10px;"></svg-icon>
-              </td>
-            </tr>
-            <tr v-if="expandedOpLogRows.includes(index)">
-              <td colspan="5" class="expand-cell">
-                <div class="json-wrap">
-                  <div class="json-col">
-                    <div class="json-title">变更前 (Before):</div>
-                    <pre class="json-block">{{ opLogJson(item.before) }}</pre>
-                  </div>
-                  <div class="json-col">
-                    <div class="json-title">变更后 (After):</div>
-                    <pre class="json-block">{{ opLogJson(item.after) }}</pre>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-if="opLogList.length === 0">
-            <tr>
-              <td colspan="5" style="text-align: center; padding: 20px;">
-                {{ opLogQueried ? '暂无操作日志' : '点击【查 询】获取操作日志' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- 简单分页 -->
-      <div class="pagination" v-if="opLogList.length > 0">
-        <el-button size="mini" :disabled="opLogFilterData.page === 1" @click="changeOpLogPage(-1)">上一页</el-button>
-        <span>第 {{ opLogFilterData.page }} 页</span>
-        <el-button size="mini" :disabled="opLogList.length < opLogFilterData.page_size" @click="changeOpLogPage(1)">下一页</el-button>
-      </div>
-    </div>
-
-    <!-- 5. 系统工具 -->
-    <div class="card-box">
-      <div class="card-title">系统维护工具</div>
-      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-        <el-button type="primary" size="mini" @click="exportDatabase">导出数据库</el-button>
-        <el-button type="info" size="mini" plain @click="exportConfig">导出配置</el-button>
-        <el-button type="warning" size="mini" plain @click="pickConfigFile">导入配置</el-button>
-        <el-button type="danger" size="mini" @click="systemReset">系统复位(清空数据)</el-button>
-      </div>
-      <div class="config-row" style="margin-top: 12px;">
-        <span class="c-label">日志级别:</span>
-        <el-select v-model="logLevel" size="mini" style="width: 120px;">
-          <el-option v-for="l in logLevelOptions" :key="l" :label="l" :value="l"></el-option>
-        </el-select>
-        <el-button size="mini" @click="saveLogLevel">设置</el-button>
-      </div>
-      <input ref="configFile" type="file" accept="application/json,.json" style="display: none;" @change="importConfig">
-    </div>
-
     <!-- 规则编辑弹窗 -->
     <el-dialog title="编辑规则" :visible.sync="ruleEditVisible" width="94%" :modal-append-to-body="true">
       <div class="rule-edit-body">
@@ -393,14 +258,13 @@
 
 <script>
 import { SENSOR_DEFS, fetchSensorFields, fieldsToSensorItems, fieldsToDeviceItems, reconcileByBackend, loadLocalSensors, loadDeletedSensorKeys } from '../utils/sensors';
-import { getApiBase, setApiBase, resetApiBase } from '../utils/config';
 import { unwrapData } from '../utils/request';
 import { resolveQuickRange } from '../utils/quickRange';
 import RollTimeRangePicker from '../components/RollTimeRangePicker.vue';
 import RuleConditionGroup from '../components/RuleConditionGroup.vue';
 
 export default {
-  name: 'SysConfig',
+  name: 'RulesPage',
   components: { RollTimeRangePicker, RuleConditionGroup },
   data() {
     return {
@@ -413,18 +277,9 @@ export default {
         judge_payload_map: ''
       },
 
-      // 数据源配置（串口 / TCP，后端 v 新增 config 键）
-      dataSourceConfig: {
-        data_source: 'serial',
-        tcp_host: '127.0.0.1',
-        tcp_port: '9000',
-        heartbeat_timeout: 30
-      },
-
       // 判定记录查询
       judgeFilterData: {
         timeRange: [],
-        // 快捷时间：'custom'=自定义时间范围；'15m'/'30m'/'1h'=最近15/30分钟/1小时（与时间范围互斥）
         quickRange: 'custom',
         tankId: '',
         page: 1,
@@ -434,31 +289,6 @@ export default {
       expandedRows: [],
       judgeQueried: false,
       total: 0,
-
-      // 操作日志查询
-      opLogFilterData: {
-        deviceId: '',
-        logType: '',
-        operationType: '',
-        timeRange: [],
-        // 快捷时间：'custom'=自定义时间范围；'15m'/'30m'/'1h'=最近15/30分钟/1小时（与时间范围互斥）
-        quickRange: 'custom',
-        page: 1,
-        page_size: 15
-      },
-      opLogList: [],
-      opLogQueried: false,
-      opLogTotal: 0,
-      expandedOpLogRows: [],
-      logTypeOptions: ['control', 'system', 'config', 'data'],
-      operationTypeOptions: ['open', 'close', 'reset', 'export', 'update'],
-
-      // 日志级别设置
-      logLevel: 'INFO',
-      logLevelOptions: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-
-      // 后端服务地址（比赛现场可修改）
-      currentApiBase: getApiBase(),
 
       // 规则引擎配置
       rules: [],
@@ -475,7 +305,16 @@ export default {
       },
       fieldOptions: [],
       actuatorOptions: [],
-      opOptions: ['>', '<', '>=', '<=', '==', '!=']
+      opOptions: ['>', '<', '>=', '<=', '==', '!='],
+
+      // 智能判定结果（实时展示卡）
+      judgeResult: {
+        time: '--',
+        status: 'normal',
+        message: '等待数据...',
+        action: 'none'
+      },
+      judgeTimer: null
     }
   },
   computed: {
@@ -503,16 +342,23 @@ export default {
     const end = new Date();
     const start = new Date(end.getTime() - 24 * 3600 * 1000);
     this.judgeFilterData.timeRange = [this.formatDate(start), this.formatDate(end)];
-    this.opLogFilterData.timeRange = [this.formatDate(start), this.formatDate(end)];
 
     this.fetchSystemConfig();
     this.fetchRules();
     this.loadSensorItems();
+    // 智能判定结果：首次拉取 + 每 5 秒轮询刷新
+    this.fetchJudgeResult();
+    this.judgeTimer = setInterval(() => this.fetchJudgeResult(), 5000);
     // 判定记录不再自动查询，等待用户点击【查 询】
+  },
+  beforeDestroy() {
+    if (this.judgeTimer) {
+      clearInterval(this.judgeTimer)
+    }
   },
   methods: {
     // 加载当前传感器列表：本地用户配置 > 后端元数据 > 实时数据自动发现
-    // 以 Home 页维护的 iot_water_sensors 为权威来源，保证增删改同步到阈值/规则
+    // 以「实时监测」页维护的 iot_water_sensors 为权威来源，保证增删改同步到阈值/规则
     async loadSensorItems() {
       let items = loadLocalSensors()
       const deletedKeys = loadDeletedSensorKeys()
@@ -537,13 +383,11 @@ export default {
       this.actuatorOptions = devFields.map(d => ({ key: d.key, label: d.label }))
     },
 
-    // 获取系统配置 (对应接口 12)
+    // 获取系统配置（仅判定服务相关键）
     async fetchSystemConfig() {
       try {
         let res = await this.$http.get('/config/all');
-        // 解包 {code, data} 包裹
         res = unwrapData(res);
-        // 归一化为 { key: value } 扁平对象，兼容后端返回「数组 [{key,value}]」与「扁平对象 {key:value}」两种格式
         let map = null;
         if (Array.isArray(res)) {
           map = {};
@@ -554,21 +398,9 @@ export default {
           map = res;
         }
         if (!map) return;
-        const pick = (key) => map[key];
-        const judgeUrl = pick('judge_url');
+        const judgeUrl = map.judge_url;
         if (judgeUrl) this.systemConfig.judge_url = judgeUrl;
-        const ds = pick('data_source');
-        if (ds) this.dataSourceConfig.data_source = ds;
-        const th = pick('tcp_host');
-        if (th !== null && th !== undefined) this.dataSourceConfig.tcp_host = th;
-        const tp = pick('tcp_port');
-        if (tp !== null && tp !== undefined) this.dataSourceConfig.tcp_port = tp;
-        const hb = pick('heartbeat_timeout');
-        if (hb !== null && hb !== undefined) {
-          const v = parseFloat(hb);
-          if (!isNaN(v)) this.dataSourceConfig.heartbeat_timeout = v;
-        }
-        const jpm = pick('judge_payload_map');
+        const jpm = map.judge_payload_map;
         if (jpm && typeof jpm === 'object') {
           this.systemConfig.judge_payload_map = JSON.stringify(jpm);
         }
@@ -577,7 +409,7 @@ export default {
       }
     },
 
-    // 保存系统配置 (对应接口 13)
+    // 保存系统配置
     async saveSystemConfig() {
       try {
         const payload = { judge_url: this.systemConfig.judge_url }
@@ -599,29 +431,9 @@ export default {
       }
     },
 
-    // 保存数据源配置（逐个键写入 config 表）
-    async saveDataSourceConfig() {
-      try {
-        const cfg = this.dataSourceConfig;
-        const entries = [
-          ['data_source', cfg.data_source],
-          ['tcp_host', cfg.tcp_host],
-          ['tcp_port', String(cfg.tcp_port)],
-          ['heartbeat_timeout', String(cfg.heartbeat_timeout)]
-        ];
-        for (const [k, v] of entries) {
-          await this.$http.post('/config/save', { [k]: v });
-        }
-        this.$message.success('数据源配置已保存');
-      } catch (error) {
-        this.$message.error('保存数据源配置失败');
-      }
-    },
-
-    // 手动调用智能判定 (对应接口 7)
+    // 手动调用智能判定
     async manualJudge() {
       try {
-        // 根据文档示例，传入当前/模拟数据触发判定
         const payload = {
           temp1: 62,
           temp2: 40,
@@ -630,7 +442,6 @@ export default {
         };
         const res = await this.$http.post('/monitor/judge', payload);
         if (res && res.code === 0) {
-          // 判定结果在 res.data 内（action/status），返回说明在 res.msg
           const d = (res && res.data) || {};
           this.$message.success(`判定完成：${this.getJudgeStatusText(d.status)}，动作：${d.action || '无'}`);
           // 刷新判定记录
@@ -644,7 +455,7 @@ export default {
       }
     },
 
-    // 重置 AI 检测状态 (对应接口 17)
+    // 重置 AI 检测状态
     async resetAiStatus() {
       try {
         const res = await this.$http.post('/system/ai-reset');
@@ -656,6 +467,104 @@ export default {
       } catch (error) {
         this.$message.error('重置请求失败');
       }
+    },
+
+    // ===== 智能判定结果（从实时监测首页迁入） =====
+    async fetchJudgeResult() {
+      try {
+        let res = await this.$http.get('/monitor/judge/latest')
+        res = unwrapData(res)
+        if (res) this.applyJudgeResult(res)
+      } catch (error) {
+        // 后端可能只有 /monitor/judge 而无 /judge/latest，回退再试一次
+        try {
+          let res = await this.$http.get('/monitor/judge')
+          res = unwrapData(res)
+          if (res) this.applyJudgeResult(res)
+        } catch (e) {
+          console.error('获取判定结果失败', e)
+        }
+      }
+    },
+    applyJudgeResult(res) {
+      this.judgeResult = {
+        time: res.time || '--',
+        status: res.status || 'normal',
+        message: this.judgeStatusText(res.status),
+        action: res.action || 'none'
+      }
+    },
+    getStatusClass(status) {
+      if (status === 'normal' || status === undefined) return 'status-normal'
+      if (status.includes('low')) return 'status-warn'
+      return 'status-danger'
+    },
+    judgeStatusText(status) {
+      const map = {
+        normal: '系统正常',
+        temp_high: '水温过高',
+        temp_low: '水温过低',
+        pressure_abnormal: '压力异常',
+        flow_abnormal: '流量异常',
+        alarm: '存在异常'
+      }
+      return map[status] || status || '等待数据'
+    },
+    judgeActionText(action) {
+      if (action === undefined || action === null || action === '' || action === 'none') return '无'
+      if (typeof action === 'object' && !Array.isArray(action)) {
+        const parts = Object.keys(action).map(k => {
+          const v = action[k]
+          const name = this.actuatorName(k)
+          if (v === 1 || v === '1' || v === true) return '开' + name
+          if (v === 0 || v === '0' || v === false) return '关' + name
+          return name + '=' + v
+        })
+        return parts.length ? parts.join('、') : JSON.stringify(action)
+      }
+      const s = String(action).trim()
+      if (s.includes(':')) {
+        const parts = s.split(';').map(seg => {
+          const idx = seg.indexOf(':')
+          if (idx < 0) return null
+          const f = seg.slice(0, idx).trim()
+          const v = seg.slice(idx + 1).trim()
+          if (!f) return null
+          const name = this.actuatorName(f)
+          if (v === '1') return '开' + name
+          if (v === '0') return '关' + name
+          return name + '=' + v
+        }).filter(Boolean)
+        if (parts.length) return parts.join('、')
+      }
+      const map = {
+        stop_heating: '停止加热',
+        start_heating: '开启加热',
+        stop_pump: '停止水泵',
+        start_pump: '开启水泵',
+        emergency_stop: '紧急停机',
+        keep: '保持当前状态',
+        none: '无'
+      }
+      return map[s] || s
+    },
+    // 执行器字段 → 中文名（优先用后端执行器元数据，兜底常见映射）
+    actuatorName(key) {
+      const d = (this.actuatorOptions || []).find(x => x.key === key)
+      if (d && d.label) return d.label
+      const map = { pump: '水泵', pump2: '水泵2', pump3: '水泵3', heater: '加热器', heater2: '加热器2' }
+      return map[key] || key
+    },
+    judgeConclusionText(status) {
+      const map = {
+        normal: '系统运行正常，各项指标均在安全范围内，无需干预。',
+        temp_high: '水温超过安全上限，建议停止加热并检查温控设备。',
+        temp_low: '水温低于安全下限，建议开启加热以维持温度。',
+        pressure_abnormal: '管道压力异常，建议检查管路并调整水泵运行。',
+        flow_abnormal: '管道流量异常，建议检查水路是否堵塞或泄漏。',
+        alarm: '检测到异常状况，请及时查看报警并处理。'
+      }
+      return map[status] || '暂无判定结论。'
     },
 
     // ===== 规则引擎配置 =====
@@ -692,7 +601,6 @@ export default {
       if (!r.condition) r.condition = { checks: [] };
       r.condition = this.normalizeCondition(r.condition);
       if (!r.action) r.action = {};
-      // 规则引擎新版：priority 缺省按 100
       if (r.priority === undefined || r.priority === null || r.priority === '') r.priority = 100;
       return r;
     },
@@ -842,7 +750,6 @@ export default {
 
     removeRule(index) {
       const rule = this.rules[index]
-      // 后端 DELETE 接口用规则 id 作为标识（URL 路径参数），id 必填唯一
       const ruleId = rule && rule.id
       if (!ruleId) {
         this.$message.error('无法删除：规则ID缺失')
@@ -855,8 +762,6 @@ export default {
             if (res && res.code === 0) {
               this.rules.splice(index, 1)
               this.$message.success(res.msg || '删除成功')
-              // 删除后重新拉取后端规则列表，确认后端真实删除结果：
-              // 若后端删除接口实际未移除（如按 alarm 而非 id 匹配失败），规则会被刷回来，避免本地误以为已删
               this.fetchRules()
             } else {
               this.$message.error(res?.msg || '删除失败')
@@ -923,7 +828,7 @@ export default {
       this.fetchJudgeHistory();
     },
 
-    // 获取判定记录历史 (对应接口 10)
+    // 获取判定记录历史
     async fetchJudgeHistory() {
       try {
         const range = resolveQuickRange(this.judgeFilterData.quickRange, this.judgeFilterData.timeRange, this.formatDate);
@@ -956,207 +861,6 @@ export default {
       }
     },
 
-    // ===== 操作日志查询 =====
-    handleOpLogQuery() {
-      this.opLogFilterData.page = 1;
-      this.opLogQueried = true;
-      this.fetchOpLogHistory();
-    },
-
-    // 获取操作日志（对应后端操作日志接口，按设备标识/日志类型/操作类型/时间范围筛选）
-    async fetchOpLogHistory() {
-      try {
-        const range = resolveQuickRange(this.opLogFilterData.quickRange, this.opLogFilterData.timeRange, this.formatDate);
-        const hasRange = range && range.length === 2;
-        const params = {
-          device_id: this.opLogFilterData.deviceId ? this.opLogFilterData.deviceId.trim() : undefined,
-          log_type: this.opLogFilterData.logType || undefined,
-          operation_type: this.opLogFilterData.operationType || undefined,
-          start_time: hasRange ? range[0] : undefined,
-          end_time: hasRange ? range[1] : undefined,
-          page: this.opLogFilterData.page,
-          page_size: this.opLogFilterData.page_size
-        };
-        let res = await this.$http.get('/records/control/data', { params });
-        res = unwrapData(res);
-        this.opLogList = res.data || [];
-        this.opLogTotal = res.total || (res.data ? res.data.length : 0);
-      } catch (error) {
-        console.error('获取操作日志失败', error);
-        this.$message.error('获取操作日志失败');
-        this.opLogList = [];
-      }
-    },
-
-    changeOpLogPage(val) {
-      this.opLogFilterData.page += val;
-      this.fetchOpLogHistory();
-    },
-
-    toggleOpLogExpand(index) {
-      const idx = this.expandedOpLogRows.indexOf(index);
-      if (idx > -1) {
-        this.expandedOpLogRows.splice(idx, 1);
-      } else {
-        this.expandedOpLogRows.push(index);
-      }
-    },
-
-    // 内容摘要：优先取 description/detail/message/content 字段
-    opLogSummary(item) {
-      const txt = item.description || item.detail || item.message || item.content || '';
-      if (typeof txt === 'string') return txt;
-      try { return JSON.stringify(txt); } catch (e) { return ''; }
-    },
-
-    // 变更前后值 JSON：兼容字符串与对象，字符串尝试反序列化后美化输出
-    opLogJson(v) {
-      if (v === undefined || v === null) return '--';
-      if (typeof v === 'string') {
-        try { return JSON.stringify(JSON.parse(v), null, 2); } catch (e) { return v; }
-      }
-      try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); }
-    },
-
-    // 导出数据库 (对应接口 19)
-    exportDatabase() {
-      // 利用 a 标签触发文件下载，APP 内用绝对地址直连后端
-      const link = document.createElement('a');
-      link.href = getApiBase() + '/api/system/export-db';
-      link.download = 'iot_water.db';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      this.$message.success('数据库导出请求已发送');
-    },
-
-    // 导出配置 (GET /config/export，返回 JSON，前端保存为文件)
-    async exportConfig() {
-      try {
-        let res = await this.$http.get('/config/export');
-        // 解包 {code, data} 包裹，导出扁平配置对象（否则再导入时会带上 code/data/msg 污染配置）
-        res = unwrapData(res);
-        const text = typeof res === 'string' ? res : JSON.stringify(res, null, 2);
-        const blob = new Blob([text], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'iot_water_config.json';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        this.$message.success('配置已导出');
-      } catch (e) {
-        this.$message.error('导出配置失败');
-      }
-    },
-
-    // 触发选择配置文件
-    pickConfigFile() {
-      this.$refs.configFile.click();
-    },
-
-    // 导入配置 (POST /config/import，请求体为完整配置 JSON)
-    importConfig(event) {
-      const file = event.target.files && event.target.files[0];
-      event.target.value = ''; // 允许重复选择同一文件
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        let payload;
-        try {
-          payload = JSON.parse(reader.result);
-        } catch (e) {
-          this.$message.error('配置文件不是合法的 JSON');
-          return;
-        }
-        this.$confirm('导入配置将覆盖当前配置，确定继续？', '提示', { type: 'warning' })
-          .then(async () => {
-            try {
-              const res = await this.$http.post('/config/import', payload);
-              if (res && res.code === 0) {
-                this.$message.success(res.msg || '配置已导入');
-                this.fetchSystemConfig();
-                this.fetchRules();
-              } else {
-                this.$message.error((res && res.msg) || '导入失败');
-              }
-            } catch (e) {
-              this.$message.error('导入配置失败');
-            }
-          }).catch(() => {});
-      };
-      reader.onerror = () => this.$message.error('读取配置文件失败');
-      reader.readAsText(file);
-    },
-
-    // 设置日志级别 (POST /system/log-level)
-    async saveLogLevel() {
-      try {
-        const res = await this.$http.post('/system/log-level', { level: this.logLevel });
-        if (res && res.code === 0) {
-          this.$message.success(res.msg || '日志级别已设置');
-        } else {
-          this.$message.error((res && res.msg) || '设置失败');
-        }
-      } catch (e) {
-        this.$message.error('设置日志级别失败');
-      }
-    },
-
-    // 系统复位 (对应接口 18) —— 高危操作，双重确认
-    async systemReset() {
-      this.$confirm('此操作将清空所有历史数据并恢复默认阈值，是否继续？', '警告', {
-        type: 'warning'
-      }).then(() => {
-        // 高危操作二次确认：需输入「复位」二字才能执行
-        this.$prompt('此操作不可恢复，请输入「复位」以确认执行系统复位', '高危操作二次确认', {
-          confirmButtonText: '确认复位',
-          cancelButtonText: '取消',
-          inputPattern: /^复位$/,
-          inputErrorMessage: '请输入「复位」'
-        }).then(async () => {
-          try {
-            const res = await this.$http.post('/system/reset');
-            if (res.code === 0) {
-              this.$message.success(res.msg || '系统已复位');
-            } else {
-              this.$message.error(res.msg || '复位失败');
-            }
-          } catch (error) {
-            this.$message.error('复位请求失败');
-          }
-        }).catch(() => {});
-      }).catch(() => {});
-    },
-
-    // ===== 后端服务地址（比赛现场换网时用） =====
-    saveApiBase() {
-      const url = (this.currentApiBase || '').trim()
-      if (!url) {
-        this.$message.warning('请输入后端地址，如 http://192.168.1.100:5001')
-        return
-      }
-      // 简单校验格式
-      if (!/^https?:\/\//i.test(url)) {
-        this.$message.warning('地址必须以 http:// 或 https:// 开头')
-        return
-      }
-      setApiBase(url)
-      this.$message.success('后端地址已保存，页面即将刷新以重新连接...')
-      setTimeout(() => window.location.reload(), 1200)
-    },
-    resetApiBase() {
-      this.$confirm('确定恢复默认后端地址吗？', '提示', { type: 'warning' })
-        .then(() => {
-          resetApiBase()
-          this.currentApiBase = getApiBase()
-          this.$message.success('已恢复默认地址，页面即将刷新...')
-          setTimeout(() => window.location.reload(), 1200)
-        }).catch(() => {})
-    },
-
     // 判定状态样式
     getJudgeStatusClass(status) {
       if (status === 'normal' || status === undefined) return 'status-normal';
@@ -1186,6 +890,48 @@ export default {
 </script>
 
 <style scoped>
+/* 智能判定结果卡片 */
+.judge-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.judge-row {
+  display: flex;
+  align-items: center;
+  background: #f5f7fa;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.judge-row .data-label {
+  flex-shrink: 0;
+  display: inline-block;
+  margin-bottom: 0;
+  margin-right: 8px;
+  color: #606266;
+}
+
+.judge-action {
+  color: #303133;
+  font-weight: 600;
+}
+
+.judge-conclusion {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 卡片标题右侧时间样式 */
+.time {
+  margin-left: auto;
+  font-size: 12px;
+  color: #909399;
+  font-weight: normal;
+}
+
 /* 智能判定设置布局 */
 .judge-config {
   display: flex;
@@ -1257,22 +1003,10 @@ export default {
   color: #606266;
 }
 
-/* 分页 */
-.pagination {
-  margin-top: 15px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-  font-size: 12px;
-  color: #909399;
-}
-
 /* 状态标签样式 */
 .status-tag {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 12px;
   font-weight: 600;
 }
 
@@ -1344,8 +1078,14 @@ export default {
   color: #909399;
 }
 
-/* ===== 移动端适配 ===== */
+/* 响应式：手机端显示卡片，隐藏表格 */
+.mobile-only { display: none; }
+.desktop-only { display: block; }
+
 @media (max-width: 640px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: block !important; }
+
   .json-wrap {
     flex-direction: column;
   }
@@ -1379,15 +1119,6 @@ export default {
   .rule-field-row .el-input-number {
     width: 100% !important;
   }
-}
-
-/* 响应式：手机端显示卡片，隐藏表格 */
-.mobile-only { display: none; }
-.desktop-only { display: block; }
-
-@media (max-width: 640px) {
-  .desktop-only { display: none !important; }
-  .mobile-only { display: block !important; }
 
   .filter-form {
     flex-direction: column;
@@ -1433,41 +1164,9 @@ export default {
     border-top: 1px dashed var(--border);
   }
 
-  /* 操作日志/判定记录卡片 */
-  .log-card {
-    background: #fafbfc;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 10px;
-  }
-  .log-card-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 4px 0;
-    font-size: 13px;
-  }
-  .log-card-label {
-    color: var(--text-2);
-    flex-shrink: 0;
-    margin-right: 12px;
-  }
-  .log-card-value {
-    color: var(--text-1);
-    text-align: right;
-    max-width: 65%;
-    word-break: break-all;
-  }
-
   /* 弹窗全宽 */
   .el-dialog {
     width: 94% !important;
-  }
-
-  .pagination .el-button {
-    padding: 8px 14px;
-    font-size: 14px;
   }
 }
 </style>

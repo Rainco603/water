@@ -77,30 +77,6 @@
       <div ref="usageChart" class="usage-chart" style="width: 100%; height: 180px;"></div>
     </div>
 
-    <!-- 3. 设备运行状态（运行中 / 关闭） -->
-    <div class="card-box">
-      <div class="card-title">设备运行状态 <svg-icon name="device-status" :size="16" class="card-title-icon"/></div>
-      <div class="device-run-grid">
-        <div class="device-run-card device-run-card--on">
-          <div class="device-run-num">{{ runningCount }}</div>
-          <div class="device-run-label">设备运行中</div>
-        </div>
-        <div class="device-run-card device-run-card--off">
-          <div class="device-run-num">{{ stoppedCount }}</div>
-          <div class="device-run-label">设备关闭</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. 系统状态（正常 / 异常占比环形图） -->
-    <div class="card-box">
-      <div class="card-title">系统状态 <svg-icon name="system" :size="16" class="card-title-icon"/></div>
-      <div v-if="systemTotal > 0" ref="systemChart" class="system-chart" style="width: 100%; height: 220px;"></div>
-      <div v-else style="text-align:center;color:#909399;padding:24px;font-size:12px;">
-        暂无阈值数据，无法统计系统状态
-      </div>
-    </div>
-
   </div>
 </template>
 
@@ -134,15 +110,7 @@ export default {
       usageResults: {},
       usageLoading: false,
       usageTimer: null,
-      usageChart: null,
-      // ===== 设备运行状态 =====
-      deviceStatus: {},
-      statusTimer: null,
-      // ===== 系统状态（正常/异常占比） =====
-      systemNormal: 0,
-      systemAbnormal: 0,
-      sysChart: null,
-      sysTimer: null
+      usageChart: null
     }
   },
   created() {
@@ -153,30 +121,18 @@ export default {
   mounted() {
     this.fetchStatistics()
     this.fetchUsageDurations()
-    this.fetchDeviceStatus()
-    this.fetchSystemStatus()
 
     this.statTimer = setInterval(() => this.fetchStatistics(), 60000)
     this.usageTimer = setInterval(() => this.fetchUsageDurations(), 60000)
-    this.statusTimer = setInterval(() => this.fetchDeviceStatus(), 5000)
-    this.sysTimer = setInterval(() => this.fetchSystemStatus(), 10000)
     window.addEventListener('resize', this.resizeUsageChart)
-    window.addEventListener('resize', this.resizeSystemChart)
   },
   beforeDestroy() {
     if (this.statTimer) clearInterval(this.statTimer)
     if (this.usageTimer) clearInterval(this.usageTimer)
-    if (this.statusTimer) clearInterval(this.statusTimer)
-    if (this.sysTimer) clearInterval(this.sysTimer)
     window.removeEventListener('resize', this.resizeUsageChart)
-    window.removeEventListener('resize', this.resizeSystemChart)
     if (this.usageChart) {
       this.usageChart.dispose()
       this.usageChart = null
-    }
-    if (this.sysChart) {
-      this.sysChart.dispose()
-      this.sysChart = null
     }
   },
   computed: {
@@ -204,21 +160,6 @@ export default {
           value: this.formatStat(c.field, this.statResults[c.field])
         }
       })
-    },
-    // 运行中的执行器数量（deviceStatus 值为 1 视为运行中）
-    runningCount() {
-      return this.devices.filter(d => this.isOn(this.deviceStatus[d.key])).length
-    },
-    // 关闭的执行器数量
-    stoppedCount() {
-      return this.devices.length - this.runningCount
-    },
-    // 系统状态统计总量与正常率
-    systemTotal() {
-      return this.systemNormal + this.systemAbnormal
-    },
-    systemNormalPercent() {
-      return this.systemTotal ? Math.round(this.systemNormal / this.systemTotal * 100) : 0
     }
   },
   methods: {
@@ -498,114 +439,6 @@ export default {
     },
     resizeUsageChart() {
       if (this.usageChart) this.usageChart.resize()
-    },
-
-    // ===== 设备运行状态 =====
-    async fetchDeviceStatus() {
-      try {
-        let res = await this.$http.get('/monitor/device/status')
-        res = unwrapData(res)
-        const status = {}
-        this.devices.forEach(d => {
-          status[d.key] = res[d.key] ?? res[d.key + '_status'] ?? 0
-        })
-        this.deviceStatus = status
-      } catch (error) {
-        const status = {}
-        this.devices.forEach(d => { status[d.key] = 0 })
-        this.deviceStatus = status
-      }
-    },
-
-    // ===== 系统状态（正常/异常占比） =====
-    // 字段默认报警上下限（与报警页一致）
-    defaultThreshold(field) {
-      if (/^temp/.test(field)) return { min: 5, max: 60 }
-      if (field === 'pressure') return { min: 20, max: 150 }
-      if (field === 'flow') return { min: 0.2, max: 5 }
-      return { min: 0, max: 100 }
-    },
-    // 读取本地阈值（与报警页共享 localStorage）
-    loadThresholds() {
-      try {
-        const raw = localStorage.getItem('iot_water_thresholds')
-        if (raw) {
-          const obj = JSON.parse(raw)
-          if (obj && typeof obj === 'object') return obj
-        }
-      } catch (e) { /* 解析失败用默认 */ }
-      return {}
-    },
-    // 统计各传感器是否在报警上下限内，渲染正常/异常占比环形图
-    async fetchSystemStatus() {
-      try {
-        let res = await this.$http.get('/monitor/sensor/latest')
-        res = unwrapData(res)
-        const latest = res || {}
-        const thresholds = this.loadThresholds()
-        let normal = 0
-        let abnormal = 0
-        this.sensorItems.forEach(s => {
-          const v = Number(latest[s.key])
-          if (isNaN(v)) return
-          const min = thresholds[s.key + '_min'] !== undefined ? Number(thresholds[s.key + '_min']) : this.defaultThreshold(s.key).min
-          const max = thresholds[s.key + '_max'] !== undefined ? Number(thresholds[s.key + '_max']) : this.defaultThreshold(s.key).max
-          if (v >= min && v <= max) { normal++ } else { abnormal++ }
-        })
-        this.systemNormal = normal
-        this.systemAbnormal = abnormal
-      } catch (e) {
-        this.systemNormal = 0
-        this.systemAbnormal = 0
-      }
-      this.$nextTick(() => this.renderSystemChart())
-    },
-    renderSystemChart() {
-      const el = this.$refs.systemChart
-      if (!el) return
-      let chart = echarts.getInstanceByDom(el)
-      if (!chart) chart = echarts.init(el)
-      this.sysChart = chart
-      const total = this.systemTotal
-      chart.setOption({
-        tooltip: {
-          trigger: 'item',
-          formatter: p => `${p.name}：${p.value} 项（${p.percent}%）`
-        },
-        legend: {
-          bottom: 0,
-          icon: 'circle',
-          itemWidth: 8,
-          itemHeight: 8,
-          textStyle: { color: '#606266', fontSize: 12 },
-          data: ['正常', '异常']
-        },
-        title: {
-          text: total ? this.systemNormalPercent + '%' : '--',
-          subtext: '正常率',
-          left: 'center',
-          top: '32%',
-          textStyle: { fontSize: 24, fontWeight: 'bold', color: '#14b8a6' },
-          subtextStyle: { fontSize: 12, color: '#909399' }
-        },
-        series: [{
-          type: 'pie',
-          radius: ['55%', '72%'],
-          center: ['50%', '42%'],
-          avoidLabelOverlap: true,
-          label: { show: false },
-          labelLine: { show: false },
-          emphasis: { scaleSize: 4 },
-          itemStyle: { borderColor: '#ffffff', borderWidth: 2 },
-          data: [
-            { name: '正常', value: this.systemNormal, itemStyle: { color: '#67c23a' } },
-            { name: '异常', value: this.systemAbnormal, itemStyle: { color: '#f56c6c' } }
-          ]
-        }]
-      }, true)
-    },
-    resizeSystemChart() {
-      if (this.sysChart) this.sysChart.resize()
     }
   }
 }
@@ -693,49 +526,5 @@ export default {
 .usage-chart {
   width: 100%;
   min-height: 140px;
-}
-
-/* 设备运行状态卡片 */
-.device-run-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.device-run-card {
-  border-radius: 12px;
-  padding: 24px 12px;
-  text-align: center;
-}
-
-.device-run-num {
-  font-size: 34px;
-  font-weight: bold;
-  line-height: 1.2;
-}
-
-.device-run-label {
-  font-size: 13px;
-  margin-top: 8px;
-}
-
-.device-run-card--on {
-  background: rgba(103, 194, 58, 0.1);
-  border: 1px solid rgba(103, 194, 58, 0.35);
-}
-.device-run-card--on .device-run-num { color: #67c23a; }
-.device-run-card--on .device-run-label { color: #67c23a; }
-
-.device-run-card--off {
-  background: rgba(144, 147, 153, 0.1);
-  border: 1px solid rgba(144, 147, 153, 0.3);
-}
-.device-run-card--off .device-run-num { color: #909399; }
-.device-run-card--off .device-run-label { color: #909399; }
-
-/* 系统状态环形图 */
-.system-chart {
-  width: 100%;
-  min-height: 220px;
 }
 </style>

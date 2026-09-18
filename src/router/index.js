@@ -1,10 +1,12 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
-import Home from '../views/Home.vue'
+import Monitor from '../views/Monitor.vue'
 import Records from '../views/Records.vue'
 import Alarms from '../views/Alarms.vue'
-import Config from '../views/Config.vue'
 import Statistics from '../views/Statistics.vue'
+import Control from '../views/Control.vue'
+import Rules from '../views/Rules.vue'
+import Ops from '../views/Ops.vue'
 import TankDetail from '../views/TankDetail.vue'
 
 Vue.use(VueRouter)
@@ -12,8 +14,13 @@ Vue.use(VueRouter)
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: Home
+    name: 'Monitor',
+    component: Monitor
+  },
+  {
+    path: '/control',
+    name: 'Control',
+    component: Control
   },
   {
     path: '/records',
@@ -26,9 +33,9 @@ const routes = [
     component: Alarms
   },
   {
-    path: '/config',
-    name: 'Config',
-    component: Config
+    path: '/rules',
+    name: 'Rules',
+    component: Rules
   },
   {
     path: '/statistics',
@@ -36,9 +43,15 @@ const routes = [
     component: Statistics
   },
   {
+    path: '/ops',
+    name: 'Ops',
+    component: Ops
+  },
+  {
     path: '/tank/:id',
     name: 'TankDetail',
-    component: TankDetail
+    component: TankDetail,
+    meta: { hideTab: true }
   }
 ]
 
