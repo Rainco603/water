@@ -182,7 +182,7 @@
         <div class="transfer-progress-meta">水泵：{{ deviceLabel(activeTransfer.device) }} · 目标 {{ formatLiters(activeTransfer.target_liters) }} L</div>
         <el-progress :percentage="transferPercent" :show-text="false"></el-progress>
         <div class="transfer-progress-meta">已输送 {{ formatLiters(activeTransfer.accumulated_liters) }} / {{ formatLiters(activeTransfer.target_liters) }} L</div>
-        <div class="transfer-progress-meta">累计流量：{{ formatLiters(sensorData.flow_total) }} L</div>
+        <div class="transfer-progress-meta">累积体积：{{ formatLiters(sensorData.flow_total) }} L</div>
         <el-button size="mini" type="danger" plain @click="stopActiveTransfer">停止输送</el-button>
       </div>
 
@@ -670,7 +670,7 @@ export default {
       }
     },
 
-    // 加载定时任务列表（从后端 API）
+    // 加载定时任务列表（后端 API 优先，失败/空时回退本地 localStorage 缓存，避免离线时任务丢失）
     async loadSchedules() {
       try {
         let res = await this.$http.get('/schedules')
@@ -686,10 +686,37 @@ export default {
           }))
           const maxId = res.reduce((max, s) => Math.max(max, s.id || 0), 0)
           this.scheduleNextId = maxId + 1
+          // 缓存到本地，作为后端不可用时的兜底
+          this.saveSchedulesToStorage()
+          return
         }
       } catch (e) {
-        console.error('加载定时任务失败', e)
+        console.error('加载定时任务失败，尝试本地缓存', e)
       }
+      // 后端不可用或返回空：回退本地缓存
+      this.loadSchedulesFromStorage()
+    },
+
+    // 从本地 localStorage 读取定时任务兜底
+    loadSchedulesFromStorage() {
+      try {
+        const raw = localStorage.getItem('iot_water_schedules')
+        if (raw) {
+          const arr = JSON.parse(raw)
+          if (Array.isArray(arr) && arr.length) {
+            this.schedules = arr
+            const maxId = arr.reduce((max, s) => Math.max(max, s.id || 0), 0)
+            this.scheduleNextId = maxId + 1
+          }
+        }
+      } catch (e) { /* 解析失败用空列表 */ }
+    },
+
+    // 保存定时任务列表到本地 localStorage（始终执行，保证离线不丢失）
+    saveSchedulesToStorage() {
+      try {
+        localStorage.setItem('iot_water_schedules', JSON.stringify(this.schedules))
+      } catch (e) { /* 忽略 */ }
     },
 
     // 把定时任务时间统一为 'HH:mm:ss'（旧数据若缺秒则补 0）
@@ -700,16 +727,18 @@ export default {
       return t
     },
 
-    // 保存定时任务列表（到后端 API）
+    // 保存定时任务列表（写本地 localStorage + 尝试同步后端）
     async saveSchedules() {
+      // 先落本地缓存，保证任何情况下（含后端未连）切页不丢失
+      this.saveSchedulesToStorage()
+      // 无论后端是否同步成功，都通知常驻引擎刷新（引擎会优先走后端、失败回退本地缓存）
+      window.dispatchEvent(new Event('schedules-changed'))
       try {
         await this.$http.post('/schedules', {
           schedules: this.schedules
         })
-        // 通知常驻的定时任务引擎（App.vue）刷新本地副本
-        window.dispatchEvent(new Event('schedules-changed'))
       } catch (e) {
-        console.error('保存定时任务失败', e)
+        console.error('保存定时任务到后端失败（已缓存到本地）', e)
       }
     },
 

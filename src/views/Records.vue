@@ -7,19 +7,23 @@
       <div class="filter-form">
         <div class="form-item form-item--filter">
           <span class="label">传感器:</span>
-          <el-select v-model="filterData.sensorType" size="mini" placeholder="请选择">
-            <el-option label="不显示传感器" value="none"></el-option>
+          <el-select v-model="filterData.sensorTypes" size="mini" multiple collapse-tags placeholder="选择传感器（可多选）">
             <el-option v-for="s in sensorTypeOptions" :key="s.value" :label="s.label" :value="s.value"></el-option>
-            <el-option label="全部" value="all"></el-option>
           </el-select>
+          <div class="multi-actions">
+            <el-button size="mini" type="text" @click="selectAllSensors">全选</el-button>
+            <el-button size="mini" type="text" @click="filterData.sensorTypes = []">清空</el-button>
+          </div>
         </div>
         <div class="form-item form-item--filter">
           <span class="label">执行器:</span>
-          <el-select v-model="filterData.actuatorType" size="mini" placeholder="请选择">
-            <el-option label="不显示执行器" value="none"></el-option>
-            <el-option label="全部" value="all"></el-option>
+          <el-select v-model="filterData.actuatorTypes" size="mini" multiple collapse-tags placeholder="选择执行器（可多选）">
             <el-option v-for="a in actuatorColumns" :key="a.key" :label="a.label" :value="a.key"></el-option>
           </el-select>
+          <div class="multi-actions">
+            <el-button size="mini" type="text" @click="selectAllActuators">全选</el-button>
+            <el-button size="mini" type="text" @click="filterData.actuatorTypes = []">清空</el-button>
+          </div>
         </div>
         <div class="form-item form-item--filter">
           <span class="label">快捷时间:</span>
@@ -179,8 +183,8 @@ export default {
     return {
       chart: null,
       filterData: {
-        sensorType: 'temp1',
-        actuatorType: 'none',
+        sensorTypes: ['temp1'], // 多选传感器字段；空数组 = 不显示传感器
+        actuatorTypes: [],      // 多选执行器字段；空数组 = 不显示执行器
         timeRange: [],
         // 快捷时间：'custom'=自定义时间范围；'15m'/'30m'/'1h'=最近15/30分钟/1小时（与时间范围筛选互斥）
         quickRange: 'custom',
@@ -254,9 +258,10 @@ export default {
         isActuator: true
       }))
     },
-    // 是否显示合并曲线卡片（传感器或执行器任选其一时显示；两者都选「不显示」时隐藏）
+    // 是否显示合并曲线卡片（传感器或执行器至少选一个时显示；全空时隐藏）
     showChart() {
-      return this.filterData.sensorType !== 'none' || this.filterData.actuatorType !== 'none'
+      return !!(this.filterData.sensorTypes && this.filterData.sensorTypes.length) ||
+             !!(this.filterData.actuatorTypes && this.filterData.actuatorTypes.length)
     },
     // 曲线分类色板（已通过 CVD 校验，白底相邻 ΔE≥8；传感器+执行器合并共用）
     curvePalette() {
@@ -292,24 +297,16 @@ export default {
       })
       return map
     },
-    // 表格显示列：按顶部 sensorType + actuatorType 合并筛选
+    // 表格显示列：按顶部 sensorTypes + actuatorTypes 多选结果合并（保持字段顺序，列顺序稳定）
     displayColumns() {
+      const sensorKeys = this.filterData.sensorTypes || []
+      const actuatorKeys = this.filterData.actuatorTypes || []
       const cols = []
-      // 传感器列：选「不显示传感器」时不加入任何传感器列
-      if (this.filterData.sensorType === 'none') {
-        // 不显示传感器
-      } else if (this.filterData.sensorType && this.filterData.sensorType !== 'all') {
-        cols.push(...this.sensorColumns.filter(c => c.key === this.filterData.sensorType))
-      } else {
-        cols.push(...this.sensorColumns)
+      if (sensorKeys.length) {
+        cols.push(...this.sensorColumns.filter(c => sensorKeys.indexOf(c.key) >= 0))
       }
-      // 执行器状态列：选「不显示执行器」时不加入任何执行器列
-      if (this.filterData.actuatorType === 'none') {
-        // 不显示执行器
-      } else if (this.filterData.actuatorType && this.filterData.actuatorType !== 'all') {
-        cols.push(...this.actuatorColumns.filter(c => c.key === this.filterData.actuatorType))
-      } else {
-        cols.push(...this.actuatorColumns)
+      if (actuatorKeys.length) {
+        cols.push(...this.actuatorColumns.filter(c => actuatorKeys.indexOf(c.key) >= 0))
       }
       return cols
     },
@@ -442,6 +439,15 @@ export default {
       })
     },
 
+    // 传感器「全选」
+    selectAllSensors() {
+      this.filterData.sensorTypes = this.sensorTypeOptions.map(s => s.value)
+    },
+    // 执行器「全选」
+    selectAllActuators() {
+      this.filterData.actuatorTypes = this.actuatorColumns.map(a => a.key)
+    },
+
     async handleQuery() {
       this.filterData.page = 1;
       this.hasQueried = true;
@@ -454,7 +460,8 @@ export default {
     // 导出历史传感数据为 CSV（后端 /records/sensor/export 直接返回文件流）
     exportCsv() {
       // 导出的是传感数据：未选传感器时给出提示
-      if (this.filterData.sensorType === 'none') {
+      const sensorKeys = this.filterData.sensorTypes || []
+      if (!sensorKeys.length) {
         this.$message.warning('请先选择要导出的传感器类型');
         return;
       }
@@ -465,9 +472,8 @@ export default {
         qs.push(`start_time=${encodeURIComponent(range[0])}`);
         qs.push(`end_time=${encodeURIComponent(range[1])}`);
       }
-      if (this.filterData.sensorType && this.filterData.sensorType !== 'all') {
-        qs.push(`sensor_type=${encodeURIComponent(this.filterData.sensorType)}`);
-      }
+      // 多选传感器：每个字段作为一个 sensor_type 参数（后端若只支持单个，则导出第一个）
+      sensorKeys.forEach(t => qs.push(`sensor_type=${encodeURIComponent(t)}`));
       const link = document.createElement('a');
       link.href = getApiBase() + '/api/records/sensor/export?' + qs.join('&');
       link.download = 'sensor_history.csv';
@@ -525,16 +531,10 @@ export default {
       };
 
       // 组装需要请求的字段：传感器（按单位走数值轴） + 执行器（0/1 阶梯线）
-      const sensorCols = [];
-      if (this.filterData.sensorType === 'all') sensorCols.push(...this.sensorColumns);
-      else if (this.filterData.sensorType && this.filterData.sensorType !== 'none') {
-        sensorCols.push(...this.sensorColumns.filter(c => c.key === this.filterData.sensorType));
-      }
-      const actuatorCols = [];
-      if (this.filterData.actuatorType === 'all') actuatorCols.push(...this.actuatorColumns);
-      else if (this.filterData.actuatorType && this.filterData.actuatorType !== 'none') {
-        actuatorCols.push(...this.actuatorColumns.filter(c => c.key === this.filterData.actuatorType));
-      }
+      const sensorKeys = this.filterData.sensorTypes || []
+      const actuatorKeys = this.filterData.actuatorTypes || []
+      const sensorCols = this.sensorColumns.filter(c => sensorKeys.indexOf(c.key) >= 0)
+      const actuatorCols = this.actuatorColumns.filter(c => actuatorKeys.indexOf(c.key) >= 0)
       const cols = [...sensorCols, ...actuatorCols];
       if (!cols.length) {
         this.renderChart([], []);
@@ -826,6 +826,17 @@ export default {
 .form-item--filter ::v-deep .el-select,
 .form-item--filter ::v-deep .el-radio-group {
   width: 100%;
+}
+
+/* 多选下拉的「全选 / 清空」快捷操作 */
+.multi-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+.multi-actions .el-button {
+  padding: 3px 6px;
+  font-size: 12px;
 }
 
 .form-actions {

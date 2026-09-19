@@ -106,16 +106,51 @@
         <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
       </div>
       <div class="chart-filter">
-        <span class="label">快捷时间:</span>
-        <el-select v-model="quickRange" size="mini" style="width: 130px">
-          <el-option label="自定义" value="custom"></el-option>
-          <el-option label="最近15分钟" value="15m"></el-option>
-          <el-option label="最近30分钟" value="30m"></el-option>
-          <el-option label="最近1小时" value="1h"></el-option>
-        </el-select>
-        <span class="label" v-show="quickRange === 'custom'">时间范围:</span>
-        <roll-time-range-picker v-show="quickRange === 'custom'" v-model="timeRange"></roll-time-range-picker>
-        <el-button type="primary" size="mini" @click="fetchChartData" round>查 询</el-button>
+        <!-- 移动端：底部弹出标签选择器（桌面端隐藏，见下方 .filter-sheet） -->
+        <div class="filter-selector mobile-only">
+          <div class="fs-row">
+            <span class="label">曲线字段</span>
+            <el-button size="small" type="primary" plain round @click="openFilterSheet" class="fs-open">
+              <svg-icon name="line-chart" :size="14"/>{{ selectedCountText }}
+            </el-button>
+          </div>
+          <div class="fs-row">
+            <span class="label">快捷时间</span>
+            <el-select v-model="quickRange" size="small" style="flex:1">
+              <el-option label="自定义" value="custom"></el-option>
+              <el-option label="最近15分钟" value="15m"></el-option>
+              <el-option label="最近30分钟" value="30m"></el-option>
+              <el-option label="最近1小时" value="1h"></el-option>
+            </el-select>
+          </div>
+          <div class="fs-row" v-show="quickRange === 'custom'">
+            <span class="label">时间范围</span>
+            <roll-time-range-picker v-model="timeRange" class="fs-range"></roll-time-range-picker>
+          </div>
+          <el-button type="primary" size="small" round class="fs-query" @click="fetchChartData">查 询</el-button>
+        </div>
+
+        <!-- 桌面端：内联多选下拉 -->
+        <div class="filter-inline desktop-only">
+          <span class="label">传感器:</span>
+          <el-select v-model="tankDisplayConfig.sensors" size="mini" multiple collapse-tags placeholder="选择传感器" style="width: 170px" @change="onCurveFilterChange">
+            <el-option v-for="s in availableSensors" :key="s.key" :label="s.label" :value="s.key"></el-option>
+          </el-select>
+          <span class="label">执行器:</span>
+          <el-select v-model="tankDisplayConfig.devices" size="mini" multiple collapse-tags placeholder="选择执行器" style="width: 170px" @change="onCurveFilterChange">
+            <el-option v-for="d in availableDevices" :key="d.key" :label="d.label" :value="d.key"></el-option>
+          </el-select>
+          <span class="label">快捷时间:</span>
+          <el-select v-model="quickRange" size="mini" style="width: 130px">
+            <el-option label="自定义" value="custom"></el-option>
+            <el-option label="最近15分钟" value="15m"></el-option>
+            <el-option label="最近30分钟" value="30m"></el-option>
+            <el-option label="最近1小时" value="1h"></el-option>
+          </el-select>
+          <span class="label" v-show="quickRange === 'custom'">时间范围:</span>
+          <roll-time-range-picker v-show="quickRange === 'custom'" v-model="timeRange"></roll-time-range-picker>
+          <el-button type="primary" size="mini" @click="fetchChartData" round>查 询</el-button>
+        </div>
       </div>
       <div class="chart-wrap" ref="chartWrap">
         <div ref="chart" style="width: 100%; height: 300px;"></div>
@@ -188,6 +223,36 @@
         <el-button type="primary" size="small" @click="confirmEdit">确定</el-button>
       </span>
     </el-dialog>
+
+    <!-- 移动端：曲线字段底部弹出选择器 -->
+    <el-drawer title="选择曲线字段" :visible.sync="filterSheetVisible" direction="btt" size="62%" :modal-append-to-body="true" class="filter-sheet-drawer">
+      <div class="filter-sheet">
+        <div class="fs-section">
+          <div class="fs-title">传感器</div>
+          <div class="fs-tags">
+            <span
+              v-for="s in availableSensors" :key="s.key"
+              class="fs-tag" :class="{ active: sheetForm.sensors.indexOf(s.key) >= 0 }"
+              @click="toggleSheetSensor(s.key)"
+            >{{ s.label }}<span class="fs-tag-unit" v-if="s.unit">{{ s.unit }}</span></span>
+          </div>
+        </div>
+        <div class="fs-section">
+          <div class="fs-title">执行器</div>
+          <div class="fs-tags">
+            <span
+              v-for="d in availableDevices" :key="d.key"
+              class="fs-tag" :class="{ active: sheetForm.devices.indexOf(d.key) >= 0 }"
+              @click="toggleSheetDevice(d.key)"
+            >{{ d.label }}</span>
+          </div>
+        </div>
+        <div class="fs-footer">
+          <el-button size="small" @click="filterSheetVisible = false">取消</el-button>
+          <el-button type="primary" size="small" @click="confirmFilterSheet">确定</el-button>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -223,6 +288,9 @@ export default {
       // 编辑弹窗临时数据
       editDialogVisible: false,
       editForm: { sensors: [], devices: [] },
+      // 移动端曲线字段底部弹出选择器
+      filterSheetVisible: false,
+      sheetForm: { sensors: [], devices: [] },
       // 所有可用传感器/执行器（全量，用于添加选择）
       availableSensors: [],
       availableDevices: []
@@ -269,6 +337,11 @@ export default {
       if (filtered.length) return filtered
       // availableDevices 异步加载中，兜底返回默认执行器清单，保证执行器卡片不消失
       return ACTUATOR_DEFS.filter(a => keys.has(a.key)).map(a => ({ key: a.key, label: a.label }))
+    },
+    // 移动端「曲线字段」按钮文案：已选传感器+执行器数量
+    selectedCountText() {
+      const n = (this.tankDisplayConfig.sensors || []).length + (this.tankDisplayConfig.devices || []).length
+      return n ? `已选 ${n} 项` : '选择字段'
     }
   },
   watch: {
@@ -405,6 +478,49 @@ export default {
         devices: [...(this.tankDisplayConfig.devices || [])]
       }
       this.editDialogVisible = true
+    },
+
+    // 曲线筛选区多选下拉变更：传感器与执行器至少保留一个字段，实时保存并刷新曲线
+    onCurveFilterChange() {
+      const sensors = this.tankDisplayConfig.sensors || []
+      const devices = this.tankDisplayConfig.devices || []
+      if (!sensors.length && !devices.length) {
+        this.$message.warning('请至少选择一个传感器或执行器')
+        // 回退：强制保留一个默认传感器，避免图表消失
+        this.tankDisplayConfig.sensors = [`temp${this.tankId}`]
+      }
+      this.saveTankDisplayConfig()
+      this.fetchChartData()
+    },
+
+    // ===== 移动端曲线字段底部弹出选择器 =====
+    openFilterSheet() {
+      this.sheetForm = {
+        sensors: [...(this.tankDisplayConfig.sensors || [])],
+        devices: [...(this.tankDisplayConfig.devices || [])]
+      }
+      this.filterSheetVisible = true
+    },
+    toggleSheetSensor(key) {
+      const i = this.sheetForm.sensors.indexOf(key)
+      if (i >= 0) this.sheetForm.sensors.splice(i, 1)
+      else this.sheetForm.sensors.push(key)
+    },
+    toggleSheetDevice(key) {
+      const i = this.sheetForm.devices.indexOf(key)
+      if (i >= 0) this.sheetForm.devices.splice(i, 1)
+      else this.sheetForm.devices.push(key)
+    },
+    confirmFilterSheet() {
+      if (!this.sheetForm.sensors.length && !this.sheetForm.devices.length) {
+        this.$message.warning('请至少选择一个字段')
+        return
+      }
+      this.tankDisplayConfig.sensors = [...this.sheetForm.sensors]
+      this.tankDisplayConfig.devices = [...this.sheetForm.devices]
+      this.filterSheetVisible = false
+      this.saveTankDisplayConfig()
+      this.fetchChartData()
     },
 
     // ===== 确认编辑 =====
@@ -954,6 +1070,114 @@ export default {
 .chart-filter .roll-time-range-picker {
   flex: 1;
   min-width: 200px;
+}
+
+/* ===== 移动端曲线筛选器（紧凑纵向 + 底部弹层） ===== */
+.filter-selector {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filter-selector .fs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filter-selector .fs-row .label {
+  flex-shrink: 0;
+  min-width: 56px;
+}
+.filter-selector .fs-open {
+  flex: 1;
+  justify-content: flex-start;
+}
+.filter-selector .fs-range {
+  flex: 1;
+  min-width: 0;
+}
+.filter-selector .fs-query {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* 底部弹出选择器 */
+.filter-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.filter-sheet .fs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.filter-sheet .fs-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.filter-sheet .fs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.filter-sheet .fs-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  background: #f5f7fa;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+  user-select: none;
+  cursor: pointer;
+}
+.filter-sheet .fs-tag:active {
+  transform: scale(0.97);
+}
+.filter-sheet .fs-tag.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.filter-sheet .fs-tag-unit {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.filter-sheet .fs-tag.active .fs-tag-unit {
+  color: var(--primary);
+  opacity: 0.7;
+}
+.filter-sheet .fs-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.filter-sheet .fs-footer .el-button {
+  flex: 1;
+}
+
+/* 底部抽屉：贴近底部、圆角顶部、抽屉头居中 */
+.filter-sheet-drawer .el-drawer__header {
+  margin-bottom: 0;
+  padding: 16px 20px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.filter-sheet-drawer .el-drawer__body {
+  padding: 12px 20px 20px;
+}
+.filter-sheet-drawer.el-drawer__wrapper {
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
 }
 
 /* ===== 图表空状态 ===== */

@@ -209,15 +209,29 @@ export default {
     },
 
     // ===== 定时任务执行引擎（常驻） =====
-    // 加载定时任务列表（与 Control.vue 的 loadSchedules 读取同一后端接口）
+    // 加载定时任务列表（后端 API 优先，失败/空时回退本地 localStorage 缓存，离线也能继续调度）
     async loadSchedules() {
       try {
         let res = await this.$http.get('/schedules')
         res = unwrapData(res)
-        this.schedules = Array.isArray(res) ? res : []
+        if (res && Array.isArray(res)) {
+          this.schedules = res
+          return
+        }
       } catch (e) {
-        // 后端未启动时静默
+        // 后端不可用，回退本地缓存
       }
+      this.loadSchedulesFromStorage()
+    },
+    // 从本地 localStorage 读取定时任务兜底（与控制页共用同一 key）
+    loadSchedulesFromStorage() {
+      try {
+        const raw = localStorage.getItem('iot_water_schedules')
+        if (raw) {
+          const arr = JSON.parse(raw)
+          if (Array.isArray(arr)) this.schedules = arr
+        }
+      } catch (e) { /* 忽略 */ }
     },
     // 控制页保存定时任务后通过事件同步，立即刷新本地副本，避免轮询延迟
     handleSchedulesChanged() {
