@@ -209,7 +209,8 @@ export default {
       // 预计时间/温度
       predictField: 'temp1', // 当前推算的温度字段
       predictRateInput: null, // 手动填写的温度变化速率(℃/分)，null 表示用自动推算
-      predictRateAuto: null, // 近 15 分钟历史数据加权回归出的速率(℃/分)
+      predictRateAuto: null, // 自动速率(℃/分)：牛顿模型推导的当前瞬时速率，拟合失败时降级为线性回归速率
+      predictModel: null, // 牛顿冷却一阶惯性模型参数 { tInf:稳态温度(℃), tau:时间常数(分) }，null=未拟合/已降级
       predictTarget: null, // 目标温度输入
       predictMinutes: null, // 分钟数输入
       predictHistoryLoading: false,
@@ -307,29 +308,49 @@ export default {
       const v = parseFloat(r.toFixed(4))
       return (v > 0 ? '+' : '') + v + ' ℃/分'
     },
-    // 目标温度 → 预计分钟数
+    // 目标温度 → 预计分钟数（自动：牛顿冷却模型反解；手动：线性外推）
     predictTimeText() {
       if (this.predictCurrent === null) return '等待实时温度数据…'
       const target = Number(this.predictTarget)
       if (this.predictTarget === null || this.predictTarget === undefined || isNaN(target)) return '请输入目标温度'
-      const rate = this.predictRate
-      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
-      if (Math.abs(rate) < 1e-9) {
-        return target === this.predictCurrent ? '当前已达标' : '速率接近 0，无法估算'
+
+      // 手动速率优先：按固定速率线性外推
+      if (this.isManualRate) {
+        return this.linearTimeToTarget(target, this.predictRate, this.predictCurrent)
       }
-      const minutes = (target - this.predictCurrent) / rate
-      if (minutes < 0) return '按当前速率无法达到该温度'
-      return '预计 ' + this.formatPredictDuration(minutes)
+      // 自动：优先牛顿冷却一阶惯性模型
+      if (this.predictModel && this.predictModel.tau) {
+        const minutes = this.newtonTimeToTarget(target)
+        if (minutes === Infinity) return '按当前趋势无法达到该温度'
+        if (minutes !== null && minutes !== undefined) {
+          if (minutes <= 0) return '当前已达标'
+          return '预计 ' + this.formatPredictDuration(minutes)
+        }
+      }
+      // 降级：线性外推（自动速率）
+      return this.linearTimeToTarget(target, this.predictRateAuto, this.predictCurrent)
     },
-    // 分钟数 → 预计温度
+    // 分钟数 → 预计温度（自动：牛顿冷却模型正解；手动：线性外推）
     predictTempText() {
       if (this.predictCurrent === null) return '等待实时温度数据…'
       const minutes = Number(this.predictMinutes)
       if (this.predictMinutes === null || this.predictMinutes === undefined || isNaN(minutes)) return '请输入分钟数'
-      const rate = this.predictRate
-      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
-      const temp = this.predictCurrent + rate * minutes
-      return '预计 ' + temp.toFixed(1) + ' ℃'
+      // 手动速率优先
+      if (this.isManualRate) {
+        const r = this.predictRate
+        if (r === null || r === undefined) return '暂无速率数据，无法估算'
+        return '预计 ' + (this.predictCurrent + r * minutes).toFixed(1) + ' ℃'
+      }
+      // 自动：优先牛顿冷却一阶惯性模型
+      if (this.predictModel && this.predictModel.tau) {
+        const temp = this.newtonTempAtTime(minutes)
+        if (temp === null) return '暂无模型数据，无法估算'
+        return '预计 ' + temp.toFixed(1) + ' ℃'
+      }
+      // 降级：线性外推（自动速率）
+      const r = this.predictRateAuto
+      if (r === null || r === undefined) return '暂无速率数据，无法估算'
+      return '预计 ' + (this.predictCurrent + r * minutes).toFixed(1) + ' ℃'
     },
     // 系统状态统计总量与正常率
     systemTotal() {
@@ -672,6 +693,33 @@ export default {
     onPredictFieldChange() {
       this.fetchPredictRate()
     },
+    // 手动速率/降级共用的线性反解：目标温度 → 分钟数；返回 null 表示无法估算
+    linearTimeToTarget(target, rate, current) {
+      if (rate === null || rate === undefined) return '暂无速率数据，无法估算'
+      if (Math.abs(rate) < 1e-9) {
+        return target === current ? '当前已达标' : '速率接近 0，无法估算'
+      }
+      const minutes = (target - current) / rate
+      if (minutes < 0) return '按当前趋势无法达到该温度'
+      return '预计 ' + this.formatPredictDuration(minutes)
+    },
+    // 牛顿冷却一阶惯性模型反解：T(t)=T∞+(T0−T∞)·e^(−t/τ) → t=−τ·ln((Ttarget−T∞)/(T0−T∞))，单位分钟
+    // 返回分钟数；返回 Infinity 表示目标温度在趋势另一侧永远达不到；返回 null 表示无模型
+    newtonTimeToTarget(target) {
+      const m = this.predictModel
+      if (!m || !(m.tau > 0)) return null
+      const ratio = (target - m.tInf) / (this.predictCurrent - m.tInf)
+      if (!(ratio > 0)) return Infinity // 目标在稳态温度另一侧，按当前趋势永远达不到
+      if (ratio >= 1) return 0 // 目标已达成（含当前恰好等于目标）
+      return -m.tau * Math.log(ratio)
+    },
+    // 牛顿冷却一阶惯性模型正解：给定未来分钟数 → 预测温度
+    newtonTempAtTime(minutes) {
+      const m = this.predictModel
+      if (!m || !(m.tau > 0)) return null
+      const tMin = Math.max(0, Number(minutes))
+      return m.tInf + (this.predictCurrent - m.tInf) * Math.exp(-tMin / m.tau)
+    },
     // 时间戳 → 毫秒（解析失败返回 NaN）
     parseTime(ts) {
       if (!ts) return NaN
@@ -707,7 +755,78 @@ export default {
       if (Math.abs(denom) < 1e-9) return null
       return (sw * swxy - swx * swy) / denom
     },
-    // 拉取近 15 分钟温度历史，加权线性回归推算变化速率(℃/分)
+    // 温度数据预处理：过滤突变（相邻超过 maxJump 则丢弃）、超范围、非数值点
+    filterTemperaturePoints(points) {
+      if (!points || !points.length) return []
+      const maxJump = 10 // 相邻温度突变上限（℃），超过视为传感器跳变/干扰，丢弃该点
+      const minT = 0, maxT = 100
+      const out = []
+      let prev = null
+      points.forEach(p => {
+        const v = Number(p.v)
+        if (isNaN(v) || v < minT || v > maxT) return
+        if (prev !== null && Math.abs(v - prev.v) > maxJump) return // 突变点丢弃
+        out.push({ t: p.t, v })
+        prev = p
+      })
+      return out
+    },
+    // 牛顿冷却一阶惯性模型参数拟合（滚动最小二乘 + 对数线性化）
+    // 模型 T(t)=T∞+(T0−T∞)·e^(−t/τ)。先用网格搜索稳态温度 T∞ 使 SSE 最小，
+    // 再对给定 T∞ 的变换 y=ln|T−T∞| 做加权线性回归求 τ。返回 {tInf, tau, sse} 或 null（失败）
+    fitNewtonModel(points) {
+      if (!points || points.length < 3) return null
+      const yArr = points.map(p => p.v)
+      const yMin = Math.min(...yArr)
+      const yMax = Math.max(...yArr)
+      const span = Math.max(1e-6, yMax - yMin)
+      const yMid = (yMin + yMax) / 2
+      // 稳态温度扫描区间：趋势单调上升时在 [max, max+span]；单调下降时在 [min−span, min]；区间外扩 30%
+      const rising = yArr[yArr.length - 1] > yArr[0]
+      const lo = rising ? yMax : yMin - span
+      const hi = rising ? yMax + span : yMin
+      const tInfLo = lo - 0.3 * span
+      const tInfHi = hi + 0.3 * span
+      let best = null
+      // 网格搜索（含端点与中点，55 档）
+      const grid = []
+      for (let i = 0; i <= 53; i++) grid.push(tInfLo + (tInfHi - tInfLo) * i / 53)
+      grid.push(tInfLo, tInfHi, yMid, yMid + span, yMid - span)
+      grid.forEach(tInf => {
+        // 忽略退化：T≈T∞ 会导致对数变换爆炸，跳过
+        if (Math.abs(tInf - yMid) < 1e-9) return
+        // 对数线性化 y=ln|T−T∞| 的加权最小二乘
+        const t0 = points[0].t
+        let sw = 0, swx = 0, swy = 0, swxy = 0, swx2 = 0
+        const tauMin = 0.5 // 时间常数下限（分钟），避免过拟合瞬态
+        let denomOk = true
+        points.forEach(p => {
+          const x = (p.t - t0) / 60000
+          const y = Math.log(Math.abs(p.v - tInf))
+          const w = 1 // 此处不额外加权，网格搜索已覆盖整体拟合
+          sw += w; swx += w * x; swy += w * y; swxy += w * x * y; swx2 += w * x * x
+        })
+        const denom = sw * swx2 - swx * swx
+        if (Math.abs(denom) < 1e-9) { denomOk = false }
+        let tau = null, slope = 0
+        if (denomOk) {
+          slope = (sw * swxy - swx * swy) / denom
+          if (slope < 0) tau = -1 / slope // τ = −1/斜率（分钟）
+          if (tau !== null && tau < tauMin) tau = tauMin
+        }
+        if (tau === null) return
+        // 计算原始温度尺度下的 SSE，选全局最优
+        let sse = 0
+        points.forEach(p => {
+          const tMin = (p.t - t0) / 60000
+          const pred = tInf + (points[0].v - tInf) * Math.exp(-tMin / tau)
+          sse += (p.v - pred) * (p.v - pred)
+        })
+        if (!best || sse < best.sse) best = { tInf, tau, sse }
+      })
+      return best
+    },
+    // 拉取近 15 分钟温度历史，拟合牛顿冷却一阶惯性模型（成功则更新 predictModel/predictRateAuto；失败降级为线性回归）
     async fetchPredictRate() {
       if (this.predictHistoryLoading) return
       this.predictHistoryLoading = true
@@ -722,8 +841,23 @@ export default {
           .map(p => ({ t: this.parseTime(p.timestamp), v: Number(p.value) }))
           .filter(p => !isNaN(p.t) && !isNaN(p.v))
           .sort((a, b) => a.t - b.t)
-        this.predictRateAuto = this.linearSlope(points)
+        // 预处理：过滤突变、超范围、非数值
+        const cleaned = this.filterTemperaturePoints(points)
+        if (cleaned.length >= 3) {
+          const model = this.fitNewtonModel(cleaned)
+          if (model && model.tau > 0) {
+            this.predictModel = { tInf: model.tInf, tau: model.tau }
+            // 当前瞬时速率 dT/dt = (T∞−T0)/τ  （℃/分），用于数值展示
+            const cur = this.predictCurrent
+            if (cur !== null) this.predictRateAuto = (model.tInf - cur) / model.tau
+            return
+          }
+        }
+        // 拟合失败或数据不足：降级为线性回归
+        this.predictModel = null
+        this.predictRateAuto = this.linearSlope(cleaned)
       } catch (e) {
+        this.predictModel = null
         this.predictRateAuto = null
       } finally {
         this.predictHistoryLoading = false
