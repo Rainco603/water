@@ -90,7 +90,7 @@
       </span>
     </el-dialog>
 
-    <!-- 定时任务管理（仅前端本地，切换手动模式后生效） -->
+    <!-- 定时任务管理（自动模式下由系统按计划执行，手动模式不触发） -->
     <div class="card-box">
       <div class="card-title">
         定时任务
@@ -104,8 +104,8 @@
               <tr>
                 <th>设备</th>
                 <th>动作</th>
-                <th>时间</th>
                 <th>重复</th>
+                <th>启用</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -119,6 +119,9 @@
                   <span v-if="!s.actions || !s.actions.length" class="status-tag status-warn">未设置</span>
                 </td>
                 <td>{{ repeatText(s.repeat) }}</td>
+                <td>
+                  <el-switch v-model="s.enabled" @change="toggleSchedule(s)"></el-switch>
+                </td>
                 <td>
                   <el-button size="mini" type="text" @click="openScheduleEdit(index)">编辑</el-button>
                   <el-button size="mini" type="text" style="color: #f56c6c;" @click="removeSchedule(index)">删除</el-button>
@@ -147,6 +150,10 @@
           <div class="schedule-card-row">
             <span class="schedule-card-label">重复</span>
             <span class="schedule-card-value">{{ repeatText(s.repeat) }}</span>
+          </div>
+          <div class="schedule-card-row">
+            <span class="schedule-card-label">启用</span>
+            <span class="schedule-card-value"><el-switch v-model="s.enabled" @change="toggleSchedule(s)"></el-switch></span>
           </div>
           <div class="schedule-card-actions">
             <el-button size="mini" type="text" @click="openScheduleEdit(index)">编辑</el-button>
@@ -416,8 +423,6 @@ export default {
     this.pollData()
 
     this.timer = setInterval(() => this.pollData(), 3000)
-    // 每秒检查一次定时任务（时间已精确到秒）
-    this.scheduleTimer = setInterval(() => this.checkSchedules(), 1000)
     // 定流量输送：每 2 秒轮询一次运行中任务的进度
     this.transferTimer = setInterval(() => this.pollActiveTransfer(), 2000)
     // 加载定流量输送任务记录，并恢复页面刷新前遗留的「运行中」任务进度
@@ -426,9 +431,6 @@ export default {
   beforeDestroy() {
     if (this.timer) {
       clearInterval(this.timer)
-    }
-    if (this.scheduleTimer) {
-      clearInterval(this.scheduleTimer)
     }
     if (this.transferTimer) {
       clearInterval(this.transferTimer)
@@ -668,42 +670,16 @@ export default {
       }
     },
 
-    // 定时任务专用控制：绕过自动模式检查，直接下发控制指令
-    async executeScheduledAction(device, value) {
-      if (!this.online) {
-        this.$message.warning('设备离线，无法下发控制指令')
-        return
-      }
-      const payload = { [device]: value ? 1 : 0 }
-      try {
-        const res = await this.$http.post('/monitor/device/control', payload)
-        if (res.code === 0) {
-          this.$message.success(`定时任务：已${value ? '开启' : '关闭'}${this.deviceLabel(device)}`)
-          this.$set(this.deviceStatus, device, value ? 1 : 0)
-        } else {
-          this.$message.error(res.msg || '控制失败')
-        }
-      } catch (error) {
-        const status = error && error.response && error.response.status
-        const data = error && error.response && error.response.data
-        // 定时任务碰到定流量任务占用（HTTP 409）时给出明确提示
-        if (status === 409) {
-          this.$message.error((data && data.msg) || '该设备正被定流量任务占用，定时任务未执行')
-          return
-        }
-        this.$message.error('定时任务执行失败')
-      }
-    },
-
     // 加载定时任务列表（从后端 API）
     async loadSchedules() {
       try {
         let res = await this.$http.get('/schedules')
         res = unwrapData(res)
         if (res && Array.isArray(res)) {
-          // 兼容旧数据：把 'HH:mm' 补成 'HH:mm:ss'，保证按秒匹配
+          // 兼容旧数据：把 'HH:mm' 补成 'HH:mm:ss'，enabled 归一为布尔供 el-switch 绑定
           this.schedules = res.map(s => ({
             ...s,
+            enabled: s.enabled === undefined || s.enabled === null ? true : !!s.enabled,
             actions: Array.isArray(s.actions)
               ? s.actions.map(a => ({ ...a, time: this.normalizeScheduleTime(a.time) }))
               : s.actions
@@ -730,6 +706,8 @@ export default {
         await this.$http.post('/schedules', {
           schedules: this.schedules
         })
+        // 通知常驻的定时任务引擎（App.vue）刷新本地副本
+        window.dispatchEvent(new Event('schedules-changed'))
       } catch (e) {
         console.error('保存定时任务失败', e)
       }
@@ -800,58 +778,9 @@ export default {
       return map[repeat] || repeat
     },
 
-    // 检查并执行到期的定时任务
-    checkSchedules() {
-      if (!this.schedules || !this.schedules.length) return
-      const now = new Date()
-      const currentHours = String(now.getHours()).padStart(2, '0')
-      const currentMinutes = String(now.getMinutes()).padStart(2, '0')
-      const currentSeconds = String(now.getSeconds()).padStart(2, '0')
-      const currentTime = `${currentHours}:${currentMinutes}:${currentSeconds}`
-      const currentDay = now.getDay() // 0=周日, 6=周六
-
-      this.schedules.forEach(schedule => {
-        // enabled 缺失/空值视为启用（后端旧数据可能没有该字段，避免任务全部失效）
-        if (schedule.enabled === false || schedule.enabled === 0) return
-
-        // 检查重复模式
-        let shouldFire = false
-        if (schedule.repeat === 'daily') {
-          shouldFire = true
-        } else if (schedule.repeat === 'weekdays') {
-          shouldFire = currentDay >= 1 && currentDay <= 5
-        } else if (schedule.repeat === 'weekend') {
-          shouldFire = currentDay === 0 || currentDay === 6
-        } else if (schedule.repeat === 'once') {
-          // 仅执行一次：检查今天是否已执行过（任一动作执行过即标记）
-          if (schedule.lastFired) {
-            const lastDate = new Date(schedule.lastFired)
-            const today = new Date()
-            if (lastDate.toDateString() === today.toDateString()) {
-              return // 今天已经执行过
-            }
-          }
-          shouldFire = true
-        }
-
-        if (!shouldFire) return
-
-        // 执行所有匹配当前时间的动作（支持同一设备多个时间点）
-        const actions = schedule.actions || []
-        let fired = false
-        actions.forEach(act => {
-          if (act.time === currentTime) {
-            this.executeScheduledAction(schedule.deviceId, act.action === 1)
-            fired = true
-          }
-        })
-
-        // 标记已执行（仅一次的任务）
-        if (schedule.repeat === 'once' && fired) {
-          schedule.lastFired = now.toISOString()
-          this.saveSchedules()
-        }
-      })
+    // 切换任务的启用/停用开关（v-model 已直接改写 enabled，这里只负责持久化）
+    toggleSchedule() {
+      this.saveSchedules()
     },
 
     // ===== 水槽列表（只读副本） =====

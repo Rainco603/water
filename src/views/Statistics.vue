@@ -10,9 +10,14 @@
             <el-radio-button label="30m">30分钟</el-radio-button>
             <el-radio-button label="1h">1小时</el-radio-button>
             <el-radio-button label="2h">2小时</el-radio-button>
+            <el-radio-button label="custom">自定义</el-radio-button>
           </el-radio-group>
         </span>
         <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openStatEdit"><svg-icon name="edit" :size="14"/>编辑</el-button>
+      </div>
+      <div class="stat-custom" v-if="statWindow === 'custom'">
+        <span class="stat-custom-label">时间范围:</span>
+        <roll-time-range-picker v-model="statCustomRange"></roll-time-range-picker>
       </div>
       <div class="stat-grid">
         <div
@@ -71,8 +76,13 @@
             <el-radio-button label="1h">1小时</el-radio-button>
             <el-radio-button label="6h">6小时</el-radio-button>
             <el-radio-button label="24h">24小时</el-radio-button>
+            <el-radio-button label="custom">自定义</el-radio-button>
           </el-radio-group>
         </span>
+      </div>
+      <div class="stat-custom" v-if="usageWindow === 'custom'">
+        <span class="stat-custom-label">时间范围:</span>
+        <roll-time-range-picker v-model="usageCustomRange"></roll-time-range-picker>
       </div>
       <div ref="usageChart" class="usage-chart" style="width: 100%; height: 180px;"></div>
     </div>
@@ -84,9 +94,11 @@
 import { SENSOR_DEFS } from '../utils/sensors'
 import { unwrapData } from '../utils/request'
 import * as echarts from 'echarts'
+import RollTimeRangePicker from '../components/RollTimeRangePicker.vue'
 
 export default {
   name: 'StatisticsPage',
+  components: { RollTimeRangePicker },
   data() {
     return {
       // 实时传感数据展示项（本地持久化，与主页共享）
@@ -110,7 +122,9 @@ export default {
       usageResults: {},
       usageLoading: false,
       usageTimer: null,
-      usageChart: null
+      usageChart: null,
+      statCustomRange: [],
+      usageCustomRange: []
     }
   },
   created() {
@@ -162,6 +176,14 @@ export default {
       })
     }
   },
+  watch: {
+    statCustomRange(val) {
+      if (this.statWindow === 'custom' && val && val.length === 2 && val[0] && val[1]) this.fetchStatistics()
+    },
+    usageCustomRange(val) {
+      if (this.usageWindow === 'custom' && val && val.length === 2 && val[0] && val[1]) this.fetchUsageDurations()
+    }
+  },
   methods: {
     // ===== 本地数据加载（与主页共享 localStorage） =====
     loadSensorItems() {
@@ -192,6 +214,10 @@ export default {
       return { '30m': 30, '1h': 60, '2h': 120 }[this.statWindow] || 60
     },
     windowToRange() {
+      if (this.statWindow === 'custom') {
+        return (this.statCustomRange && this.statCustomRange.length === 2 && this.statCustomRange[0] && this.statCustomRange[1])
+          ? this.statCustomRange : []
+      }
       const minutes = this.windowMinutes()
       const end = new Date()
       const start = new Date(end.getTime() - minutes * 60 * 1000)
@@ -277,9 +303,14 @@ export default {
     },
     async fetchStatistics() {
       if (this.statLoading) return
+      const range = this.windowToRange()
+      if (!range || range.length !== 2) {
+        this.statResults = {}
+        return
+      }
       this.statLoading = true
       try {
-        const [start, end] = this.windowToRange()
+        const [start, end] = range
         const cols = this.sensorItems
         if (!cols || !cols.length) {
           this.statResults = {}
@@ -311,6 +342,10 @@ export default {
 
     // ===== 设备使用时长 =====
     usageToRange() {
+      if (this.usageWindow === 'custom') {
+        return (this.usageCustomRange && this.usageCustomRange.length === 2 && this.usageCustomRange[0] && this.usageCustomRange[1])
+          ? this.usageCustomRange : []
+      }
       const minutes = { '1h': 60, '6h': 360, '24h': 1440 }[this.usageWindow] || 1440
       const end = new Date()
       const start = new Date(end.getTime() - minutes * 60 * 1000)
@@ -339,9 +374,14 @@ export default {
     },
     async fetchUsageDurations() {
       if (this.usageLoading) return
+      const range = this.usageToRange()
+      if (!range || range.length !== 2) {
+        this.usageResults = {}
+        return
+      }
       this.usageLoading = true
       try {
-        const [start, end] = this.usageToRange()
+        const [start, end] = range
         const endTime = new Date(String(end).replace(/-/g, '/')).getTime()
         const devs = this.devices || []
         if (!devs.length) {
@@ -454,6 +494,19 @@ export default {
 
 .stat-window {
   margin-left: 12px;
+}
+
+.stat-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.stat-custom-label {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
 }
 
 .stat-card {

@@ -54,66 +54,6 @@
       </div>
     </div>
 
-    <!-- 数据统计（平均值 / 累计值，字段与类型可增删改） -->
-    <div class="card-box">
-      <div class="card-title">
-        数据统计
-        <span class="stat-window">
-          <el-radio-group v-model="statWindow" size="mini" @change="fetchStatistics">
-            <el-radio-button label="30m">30分钟</el-radio-button>
-            <el-radio-button label="1h">1小时</el-radio-button>
-            <el-radio-button label="2h">2小时</el-radio-button>
-          </el-radio-group>
-        </span>
-        <el-button size="mini" type="primary" plain style="margin-left: auto;" @click="openStatEdit"><svg-icon name="edit" :size="14"/>编辑</el-button>
-      </div>
-      <div class="stat-grid">
-        <div
-          v-for="c in statCards"
-          :key="c.id"
-          class="stat-card"
-          :class="c.type === 'total' ? 'stat-card--total' : ''"
-        >
-          <div class="stat-card-label">
-            <svg-icon :name="sensorIcon(c.field)" :size="15" class="stat-card-icon"/>
-            {{ c.label }}
-          </div>
-          <div class="stat-card-value">
-            {{ c.value }}<i v-if="c.unit" class="unit">{{ c.unit }}</i>
-          </div>
-        </div>
-        <div v-if="statCards.length === 0" style="text-align:center;color:#909399;padding:20px;font-size:12px;grid-column:1/-1;">
-          暂无统计卡片，点击【编辑】添加
-        </div>
-      </div>
-    </div>
-
-    <!-- 编辑数据统计卡片弹窗（字段来自实时传感数据，平均值/累计值可选） -->
-    <el-dialog title="编辑数据统计卡片" :visible.sync="statEditVisible" width="94%" :modal-append-to-body="true">
-      <div class="stat-edit-list">
-        <div class="stat-edit-row" v-for="(c, index) in editStatCards" :key="c.id">
-          <el-select v-model="c.field" size="mini" placeholder="选择字段" style="width: 110px;">
-            <el-option v-for="s in sensorItems" :key="s.key" :label="s.label" :value="s.key"></el-option>
-          </el-select>
-          <el-select v-model="c.mode" size="mini" style="width: 96px;">
-            <el-option label="平均值" value="avg"></el-option>
-            <el-option label="累计值" value="total"></el-option>
-          </el-select>
-          <el-button size="mini" type="danger" plain @click="editStatCards.splice(index, 1)"><svg-icon name="delete" :size="14"/></el-button>
-        </div>
-        <div v-if="editStatCards.length === 0" style="text-align:center;color:#909399;padding:16px;font-size:12px;">
-          暂无卡片，点击下方【添加卡片】新建
-        </div>
-      </div>
-      <div style="margin-top: 10px;">
-        <el-button size="mini" type="primary" plain @click="addStatCard"><svg-icon name="plus" :size="14"/>添加卡片</el-button>
-      </div>
-      <span slot="footer">
-        <el-button size="mini" @click="statEditVisible = false">取消</el-button>
-        <el-button size="mini" type="primary" @click="saveStatCards">保存</el-button>
-      </span>
-    </el-dialog>
-
     <!-- 系统状态（正常 / 异常占比环形图） -->
     <div class="card-box">
       <div class="card-title">系统状态 <svg-icon name="system" :size="16" class="card-title-icon"/></div>
@@ -174,6 +114,7 @@
           <div class="data-item" v-for="item in sensorItems" :key="item.key">
             <span class="data-label">{{ item.label }}</span>
             <span class="data-value">{{ sensorData[item.key] !== undefined ? sensorData[item.key] : '--' }} <i class="unit">{{ item.unit }}</i></span>
+            <span class="sensor-state" :class="sensorState(item).cls">{{ sensorState(item).text }}</span>
           </div>
         </div>
       </div>
@@ -186,6 +127,9 @@
             <span class="sensor-card-unit">{{ item.unit }}</span>
           </div>
           <div class="sensor-card-value">{{ sensorData[item.key] !== undefined ? sensorData[item.key] : '--' }}</div>
+          <div class="sensor-card-state">
+            <span class="sensor-state" :class="sensorState(item).cls">{{ sensorState(item).text }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -269,16 +213,7 @@ export default {
       predictTarget: null, // 目标温度输入
       predictMinutes: null, // 分钟数输入
       predictHistoryLoading: false,
-      predictTimer: null,
-      // ===== 数据统计（平均值 / 累计值，可增删改） =====
-      statWindow: '1h',
-      statResults: {},
-      statCardsConfig: [],
-      statNextId: 1,
-      statEditVisible: false,
-      editStatCards: [],
-      statLoading: false,
-      statTimer: null
+      predictTimer: null
     }
   },
   created() {
@@ -286,7 +221,6 @@ export default {
     this.loadSensorItems()
     this.loadDeletedSensorKeys()
     this.loadDevices()
-    this.loadStatCards()
     // 确保默认温度字段有效（用户可能已删除 temp1）
     if (!this.temperatureFields.some(s => s.key === this.predictField)) {
       this.predictField = this.temperatureFields.length ? this.temperatureFields[0].key : 'temp1'
@@ -300,9 +234,6 @@ export default {
     // 预计时间/温度：初始推算一次速率，之后每 60 秒刷新
     this.fetchPredictRate()
     this.predictTimer = setInterval(() => this.fetchPredictRate(), 60000)
-    // 数据统计：初始拉取一次，之后每 60 秒刷新
-    this.fetchStatistics()
-    this.statTimer = setInterval(() => this.fetchStatistics(), 60000)
     window.addEventListener('resize', this.resizeSystemChart)
     // 初始化添加水槽表单默认名
     const nextId = Math.max(0, ...this.tankList.map(t => Number(t.id))) + 1
@@ -314,9 +245,6 @@ export default {
     }
     if (this.predictTimer) {
       clearInterval(this.predictTimer)
-    }
-    if (this.statTimer) {
-      clearInterval(this.statTimer)
     }
     window.removeEventListener('resize', this.resizeSystemChart)
     if (this.sysChart) {
@@ -410,32 +338,6 @@ export default {
     systemNormalPercent() {
       return this.systemTotal ? Math.round(this.systemNormal / this.systemTotal * 100) : 0
     },
-    // 数据统计卡片（平均值 / 累计值；累计值 = 平均值 × 窗口分钟数，流量即体积 L）
-    statCards() {
-      return this.statCardsConfig.map(c => {
-        const col = this.sensorItems.find(s => s.key === c.field)
-        const label = col ? col.label : c.field
-        const unit = col ? col.unit : ''
-        if (c.mode === 'total') {
-          const avg = this.statResults[c.field]
-          const total = (avg === undefined || avg === null) ? null : avg * this.windowMinutes()
-          return {
-            id: c.id,
-            type: 'total',
-            label: label + '累计值',
-            unit: c.field === 'flow' ? 'L' : unit,
-            value: this.formatTotal(total)
-          }
-        }
-        return {
-          id: c.id,
-          type: 'avg',
-          label: label + '平均值',
-          unit: unit,
-          value: this.formatStat(c.field, this.statResults[c.field])
-        }
-      })
-    }
   },
   methods: {
     goToDetail(id) {
@@ -656,112 +558,6 @@ export default {
       return map[status] || status || '等待数据'
     },
 
-    // ===== 数据统计（平均值 / 累计值，可增删改） =====
-    formatStat(key, val) {
-      if (val === undefined || val === null || val === '--') return '--'
-      const n = Number(val)
-      if (isNaN(n)) return '--'
-      const digits = key === 'flow' ? 2 : 1
-      return parseFloat(n.toFixed(digits)).toString()
-    },
-    formatTotal(val) {
-      if (val === undefined || val === null) return '--'
-      const n = Number(val)
-      if (isNaN(n)) return '--'
-      if (n >= 10000) return (n / 10000).toFixed(2) + '万'
-      return parseFloat(n.toFixed(2)).toString()
-    },
-    // 统计窗口分钟数
-    windowMinutes() {
-      return { '30m': 30, '1h': 60, '2h': 120 }[this.statWindow] || 60
-    },
-    windowToRange() {
-      const minutes = this.windowMinutes()
-      const end = new Date()
-      const start = new Date(end.getTime() - minutes * 60 * 1000)
-      return [this.formatDate(start), this.formatDate(end)]
-    },
-    defaultStatCards() {
-      const cards = this.sensorItems.map(s => ({ id: this.statNextId++, field: s.key, mode: 'avg' }))
-      if (this.sensorItems.some(i => i.key === 'flow')) {
-        cards.push({ id: this.statNextId++, field: 'flow', mode: 'total' })
-      }
-      return cards
-    },
-    loadStatCards() {
-      try {
-        const raw = localStorage.getItem('iot_water_stat_cards')
-        if (raw) {
-          const arr = JSON.parse(raw)
-          if (Array.isArray(arr) && arr.length) {
-            this.statCardsConfig = arr
-            const maxId = arr.reduce((m, c) => Math.max(m, Number(c.id) || 0), 0)
-            this.statNextId = maxId + 1
-            return
-          }
-        }
-      } catch (e) { /* 解析失败走默认 */ }
-      this.statCardsConfig = this.defaultStatCards()
-    },
-    persistStatCards() {
-      localStorage.setItem('iot_water_stat_cards', JSON.stringify(this.statCardsConfig))
-    },
-    openStatEdit() {
-      this.editStatCards = this.statCardsConfig.map(c => ({ ...c }))
-      this.statEditVisible = true
-    },
-    addStatCard() {
-      const first = this.sensorItems[0]
-      this.editStatCards.push({
-        id: this.statNextId++,
-        field: first ? first.key : '',
-        mode: 'avg'
-      })
-    },
-    saveStatCards() {
-      const list = this.editStatCards
-        .filter(c => c.field)
-        .map(c => ({ id: c.id, field: c.field, mode: c.mode === 'total' ? 'total' : 'avg' }))
-      this.statCardsConfig = list
-      this.persistStatCards()
-      this.statEditVisible = false
-      this.$message.success('数据统计卡片已保存')
-      this.fetchStatistics()
-    },
-    // 拉取各字段平均值（累计值 = 平均值 × 窗口分钟数，在 statCards 计算属性里换算）
-    async fetchStatistics() {
-      if (this.statLoading) return
-      this.statLoading = true
-      try {
-        const [start, end] = this.windowToRange()
-        const cols = this.sensorItems
-        if (!cols || !cols.length) {
-          this.statResults = {}
-          return
-        }
-        const results = await Promise.all(
-          cols.map(col =>
-            this.$http.get('/records/sensor/chart', {
-              params: { sensor_type: col.key, start_time: start, end_time: end }
-            })
-          )
-        )
-        const newResults = {}
-        results.forEach((res, i) => {
-          const col = cols[i]
-          const values = this.normalizePoints(res)
-            .map(p => Number(p.value))
-            .filter(v => !isNaN(v))
-          newResults[col.key] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
-        })
-        this.statResults = newResults
-      } catch (e) {
-        console.error('获取数据统计失败', e)
-      } finally {
-        this.statLoading = false
-      }
-    },
-
     // ===== 系统状态（正常/异常占比，从统计分析页迁入） =====
     // 字段默认报警上下限（与报警页一致）
     defaultThreshold(field) {
@@ -780,6 +576,27 @@ export default {
         }
       } catch (e) { /* 解析失败用默认 */ }
       return {}
+    },
+    // 单个传感器当前状态标注（高温/低温/高压/低压/正常等），复用与报警页一致的上下限判断
+    sensorState(item) {
+      const raw = this.sensorData ? this.sensorData[item.key] : undefined
+      if (raw === undefined || raw === null || raw === '') return { text: '--', cls: 'muted' }
+      const v = Number(raw)
+      if (isNaN(v)) return { text: '--', cls: 'muted' }
+
+      const thresholds = this.loadThresholds()
+      const min = thresholds[item.key + '_min'] !== undefined ? Number(thresholds[item.key + '_min']) : this.defaultThreshold(item.key).min
+      const max = thresholds[item.key + '_max'] !== undefined ? Number(thresholds[item.key + '_max']) : this.defaultThreshold(item.key).max
+
+      // 按字段语义给出低/高侧文案
+      let lowText = '偏低', highText = '偏高'
+      if (/^temp/.test(item.key)) { lowText = '低温'; highText = '高温' }
+      else if (item.key === 'pressure') { lowText = '低压'; highText = '高压' }
+      else if (item.key === 'flow') { lowText = '低流量'; highText = '高流量' }
+
+      if (v < min) return { text: lowText, cls: 'low' }
+      if (v > max) return { text: highText, cls: 'high' }
+      return { text: '正常', cls: 'normal' }
     },
     // 统计各传感器是否在报警上下限内，渲染正常/异常占比环形图（复用已拉取的实时数据，避免重复请求）
     updateSystemStatus() {
@@ -1034,6 +851,33 @@ export default {
   font-weight: normal;
 }
 
+/* 传感器状态标注（高温/低温/高压/低压/正常） */
+.sensor-state {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.sensor-state.normal {
+  background: rgba(103, 194, 58, 0.12);
+  color: #67c23a;
+}
+.sensor-state.high {
+  background: rgba(245, 108, 108, 0.12);
+  color: #f56c6c;
+}
+.sensor-state.low {
+  background: rgba(64, 158, 255, 0.12);
+  color: #409eff;
+}
+.sensor-state.muted {
+  background: rgba(144, 147, 153, 0.12);
+  color: #909399;
+}
+
 /* 卡片标题右侧时间样式 */
 .time {
   margin-left: auto;
@@ -1174,78 +1018,6 @@ export default {
   min-height: 220px;
 }
 
-/* 数据统计卡片 */
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.stat-window {
-  margin-left: 12px;
-}
-
-.stat-card {
-  background: #f5f7fa;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 12px;
-  text-align: center;
-}
-
-.stat-card-label {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.stat-card-icon {
-  color: var(--primary);
-}
-
-.stat-card-value {
-  font-size: 20px;
-  font-weight: bold;
-  color: #14b8a6;
-}
-
-.stat-card-value .unit {
-  font-size: 12px;
-  color: #909399;
-  font-weight: normal;
-  font-style: normal;
-  margin-left: 2px;
-}
-
-.stat-card--total {
-  background: #fffbf0;
-  border-color: #fef0c7;
-}
-
-.stat-card--total .stat-card-value {
-  color: #f59e0b;
-}
-
-/* 编辑数据统计卡片弹窗 */
-.stat-edit-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.stat-edit-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .card-title-icon {
   color: var(--primary);
   margin-right: 4px;
@@ -1321,6 +1093,9 @@ export default {
     font-weight: bold;
     color: var(--primary);
     margin-bottom: 6px;
+  }
+  .sensor-card-state {
+    margin-top: 2px;
   }
 
   /* 预计时间/温度：手机端两列改单列 */

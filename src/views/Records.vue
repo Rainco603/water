@@ -41,29 +41,16 @@
       </div>
     </div>
 
-    <!-- 2. 传感器历史曲线图 -->
-    <div class="card-box" v-if="showSensorChart">
+    <!-- 2. 历史数据曲线（传感器 + 执行器状态合并，执行器用 0/1 阶梯线） -->
+    <div class="card-box" v-if="showChart">
       <div class="card-title">
-        传感器数据曲线
+        历史数据曲线
         <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
       </div>
       <div class="chart-wrap" ref="chartWrap">
-        <div ref="chart" style="width: 100%; height: 300px;"></div>
+        <div ref="chart" style="width: 100%; height: 340px;"></div>
         <div v-if="!hasQueried" class="chart-placeholder">请设置筛选条件后点击【查 询】查看曲线</div>
         <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round @click.stop="toggleChartFullscreen($refs.chartWrap, chart)"><svg-icon name="close" :size="14"/>退出横屏</el-button>
-      </div>
-    </div>
-
-    <!-- 2.5 执行器状态曲线图（独立区域，阶梯线 0/1，与传感器共用上方统一筛选） -->
-    <div class="card-box" v-if="showActuatorChart">
-      <div class="card-title">
-        执行器状态曲线
-        <el-button size="mini" type="text" style="margin-left: auto;" @click="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)"><svg-icon :name="fsActive ? 'close' : 'fullscreen'" :size="14"/>横屏</el-button>
-      </div>
-      <div class="chart-wrap" ref="actuatorChartWrap">
-        <div ref="actuatorChart" style="width: 100%; height: 240px;"></div>
-        <div v-if="!actuatorChartQueried" class="chart-placeholder">请选择筛选条件后点击【查 询】查看开关状态</div>
-        <el-button class="fs-exit" v-show="fsActive" size="mini" type="danger" round @click.stop="toggleChartFullscreen($refs.actuatorChartWrap, actuatorChart)"><svg-icon name="close" :size="14"/>退出横屏</el-button>
       </div>
     </div>
 
@@ -177,7 +164,7 @@
 <script>
 // 引入 ECharts 核心模块
 import * as echarts from 'echarts';
-import { SENSOR_DEFS, ACTUATOR_DEFS, sensorLabel, sensorColor, fetchSensorFields, fieldsToSensorItems, fieldsToDeviceItems, isActuatorField, loadLocalSensors, loadDeletedSensorKeys, actuatorColor, actuatorLabel, loadLocalActuators } from '../utils/sensors';
+import { SENSOR_DEFS, ACTUATOR_DEFS, fetchSensorFields, fieldsToSensorItems, fieldsToDeviceItems, isActuatorField, loadLocalSensors, loadDeletedSensorKeys, loadLocalActuators } from '../utils/sensors';
 import RollTimeRangePicker from '../components/RollTimeRangePicker.vue';
 import { getApiBase } from '../utils/config';
 import { unwrapData } from '../utils/request';
@@ -208,10 +195,6 @@ export default {
       // 组件销毁标记：异步图表请求返回后不再渲染，避免操作已 dispose 的 echarts 实例
       disposed: false,
 
-      // ===== 执行器状态曲线 =====
-      actuatorChart: null,
-      actuatorChartQueried: false,
-
       // ===== 历史定流量数据查询 =====
       transferFilter: { device: '', quickRange: 'custom', timeRange: [], page: 1, page_size: 15 },
       transferList: [],
@@ -221,7 +204,6 @@ export default {
   },
   mounted() {
     this.initChart();
-    this.initActuatorChart();
     this.loadSensorFields();
     // 模拟默认查询最近一小时的数据
     const end = new Date();
@@ -238,10 +220,6 @@ export default {
     if (this.chart) {
       this.chart.dispose();
       this.chart = null;
-    }
-    if (this.actuatorChart) {
-      this.actuatorChart.dispose();
-      this.actuatorChart = null;
     }
   },
   computed: {
@@ -276,13 +254,43 @@ export default {
         isActuator: true
       }))
     },
-    // 是否显示传感器数据曲线卡片（选「不显示传感器」时隐藏）
-    showSensorChart() {
-      return this.filterData.sensorType !== 'none'
+    // 是否显示合并曲线卡片（传感器或执行器任选其一时显示；两者都选「不显示」时隐藏）
+    showChart() {
+      return this.filterData.sensorType !== 'none' || this.filterData.actuatorType !== 'none'
     },
-    // 是否显示执行器状态曲线卡片（选「不显示执行器」或后端无执行器时隐藏）
-    showActuatorChart() {
-      return this.filterData.actuatorType !== 'none' && this.actuatorColumns.length > 0
+    // 曲线分类色板（已通过 CVD 校验，白底相邻 ΔE≥8；传感器+执行器合并共用）
+    curvePalette() {
+      return ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948', '#0aa3b5', '#b45309', '#6d28d9', '#db2777']
+    },
+    // 字段名 → 稳定且不重复的曲线颜色：对完整字段集排序后按 hash 起步、线性探测避让，
+    // 过滤条件变化不会改变既有字段的颜色（颜色跟随实体而非次序）
+    curveColorMap() {
+      const map = {}
+      const used = new Set()
+      const palette = this.curvePalette()
+      const keys = Array.from(new Set(
+        this.sensorColumns.map(c => c.key).concat(this.actuatorColumns.map(c => c.key))
+      )).sort()
+      let extra = 0
+      keys.forEach(key => {
+        let h = 0
+        for (let i = 0; i < key.length; i++) { h = ((h << 5) - h) + key.charCodeAt(i); h |= 0 }
+        let idx = Math.abs(h) % palette.length
+        let color = palette[idx]
+        let guard = 0
+        while (used.has(color) && guard < palette.length * 2) {
+          idx = (idx + 1) % palette.length
+          color = palette[idx]
+          guard++
+        }
+        if (used.has(color)) {
+          color = `hsl(${(extra * 47 + 210) % 360}, 62%, 45%)`
+          extra++
+        }
+        used.add(color)
+        map[key] = color
+      })
+      return map
     },
     // 表格显示列：按顶部 sensorType + actuatorType 合并筛选
     displayColumns() {
@@ -316,18 +324,12 @@ export default {
     }
   },
   watch: {
-    'filterData.sensorType'(val) {
-      // 切换为「不显示传感器」时释放图表实例，避免 v-if 重建 DOM 后残留旧实例
-      if (val === 'none' && this.chart) {
+    // 合并曲线卡片整体隐藏（传感器与执行器都选「不显示」）时释放图表实例，
+    // 避免 v-if 重建 DOM 后残留旧实例
+    showChart(val) {
+      if (!val && this.chart) {
         try { this.chart.dispose(); } catch (e) { /* 忽略 */ }
         this.chart = null;
-      }
-    },
-    'filterData.actuatorType'(val) {
-      // 切换为「不显示执行器」时释放图表实例，避免 v-if 重建 DOM 后残留旧实例
-      if (val === 'none' && this.actuatorChart) {
-        try { this.actuatorChart.dispose(); } catch (e) { /* 忽略 */ }
-        this.actuatorChart = null;
       }
     }
   },
@@ -351,42 +353,6 @@ export default {
         series: []
       };
       this.chart.setOption(option);
-    },
-
-    // 初始化执行器状态曲线（阶梯线，Y 轴固定 0/1）
-    initActuatorChart() {
-      if (!this.$refs.actuatorChart) return;
-      this.actuatorChart = echarts.init(this.$refs.actuatorChart);
-      const option = {
-        backgroundColor: 'transparent',
-        tooltip: { trigger: 'axis' },
-        legend: { type: 'scroll', data: [], top: 0, textStyle: { color: '#909399' } },
-        grid: { left: 8, right: 12, bottom: 46, top: 34, containLabel: true },
-        xAxis: { type: 'category', data: [], boundaryGap: false, axisLabel: { color: '#909399', hideOverlap: true }, axisLine: { lineStyle: { color: '#dcdfe6' } } },
-        yAxis: {
-          type: 'value',
-          min: -0.15,
-          max: 1.15,
-          interval: 1,
-          axisLabel: {
-            color: '#909399',
-            fontSize: 10,
-            formatter: function (val) {
-              if (val === 0) return '关闭'
-              if (val === 1) return '开启'
-              return ''
-            }
-          },
-          axisLine: { lineStyle: { color: '#dcdfe6' } },
-          splitLine: { lineStyle: { color: '#ebeef5' } }
-        },
-        dataZoom: [
-          { type: 'inside', start: 0, end: 100 },
-          { type: 'slider', start: 0, end: 100, height: 16, bottom: 8, borderColor: '#dcdfe6' }
-        ],
-        series: []
-      };
-      this.actuatorChart.setOption(option);
     },
 
     async loadSensorFields() {
@@ -479,11 +445,9 @@ export default {
     async handleQuery() {
       this.filterData.page = 1;
       this.hasQueried = true;
-      this.actuatorChartQueried = true;
       await Promise.all([
         this.fetchHistoryList(),
-        this.fetchChartData(),
-        this.fetchActuatorChartData()
+        this.fetchChartData()
       ]);
     },
 
@@ -549,9 +513,7 @@ export default {
     },
 
     async fetchChartData() {
-      // 选「不显示传感器」时不请求、不渲染传感器曲线
-      if (this.filterData.sensorType === 'none') return;
-      // 懒初始化：切换「不显示传感器」会 v-if 隐藏容器，切回后重新初始化
+      // 懒初始化：卡片被 v-if 隐藏后再显示时重新初始化
       if (!this.chart && this.$refs.chart) {
         this.initChart();
       }
@@ -562,28 +524,30 @@ export default {
         end_time: hasRange ? range[1] : undefined
       };
 
+      // 组装需要请求的字段：传感器（按单位走数值轴） + 执行器（0/1 阶梯线）
+      const sensorCols = [];
+      if (this.filterData.sensorType === 'all') sensorCols.push(...this.sensorColumns);
+      else if (this.filterData.sensorType && this.filterData.sensorType !== 'none') {
+        sensorCols.push(...this.sensorColumns.filter(c => c.key === this.filterData.sensorType));
+      }
+      const actuatorCols = [];
+      if (this.filterData.actuatorType === 'all') actuatorCols.push(...this.actuatorColumns);
+      else if (this.filterData.actuatorType && this.filterData.actuatorType !== 'none') {
+        actuatorCols.push(...this.actuatorColumns.filter(c => c.key === this.filterData.actuatorType));
+      }
+      const cols = [...sensorCols, ...actuatorCols];
+      if (!cols.length) {
+        this.renderChart([], []);
+        return;
+      }
       try {
-        if (this.filterData.sensorType === 'all') {
-          // 全部：并行请求所有传感器，叠加多条曲线（执行器曲线在独立区域展示）
-          const cols = this.sensorColumns;
-          const results = await Promise.all(
-            cols.map(col =>
-              this.$http.get('/records/sensor/chart', { params: { ...base, sensor_type: col.key } })
-            )
-          );
-          const points = results.map(r => this.normalizeChartPoints(r));
-          const series = cols.map((col, i) => this.buildSeries(col.key, points[i]));
-          const xData = this.pickXData(points);
-          this.renderChart(xData, series);
-        } else {
-          const res = await this.$http.get('/records/sensor/chart', {
-            params: { ...base, sensor_type: this.filterData.sensorType }
-          });
-          const points = this.normalizeChartPoints(res);
-          const series = [this.buildSeries(this.filterData.sensorType, points, { area: true })];
-          const xData = points.map(d => d.timestamp);
-          this.renderChart(xData, series);
-        }
+        const results = await Promise.all(
+          cols.map(col => this.$http.get('/records/sensor/chart', { params: { ...base, sensor_type: col.key } }))
+        );
+        const points = results.map(r => this.normalizeChartPoints(r));
+        const series = cols.map((col, i) => this.buildCurveSeries(col, points[i], !!col.isActuator));
+        const xData = this.pickXData(points);
+        this.renderChart(xData, series);
       } catch (error) {
         this.$message.error('获取图表数据失败');
         this.renderChart([], []);
@@ -598,22 +562,26 @@ export default {
       return Array.isArray(arr) ? arr : [];
     },
 
-    // 仅处理传感器曲线（执行器曲线已拆到独立区域）
-    buildSeries(key, data, opts = {}) {
-      const col = this.sensorColumns.find(c => c.key === key)
-      const color = sensorColor(key)
-      const name = col ? col.label : sensorLabel(key)
+    // 合并图曲线：传感器平滑折线，执行器 0/1 阶梯线；颜色由 curveColorMap 统一分配（不重复）
+    buildCurveSeries(col, data, isActuator) {
+      const color = this.curveColorMap[col.key] || '#2a78d6'
       const s = {
-        name,
+        name: col.label,
         type: 'line',
         data: (Array.isArray(data) ? data : []).map(d => d.value),
-        smooth: true,
         showSymbol: false, // 数据点密集时不显示圆点，避免挤成一团
         itemStyle: { color },
         lineStyle: { color },
-        unit: col ? (col.unit || '') : ''
+        unit: col.unit || '',
+        isActuator: !!isActuator
       };
-      if (opts.area) s.areaStyle = { color: color + '26' };
+      if (isActuator) {
+        s.step = 'start';
+        s.symbol = 'none';
+        s.lineStyle.width = 2;
+      } else {
+        s.smooth = true;
+      }
       return s;
     },
 
@@ -626,10 +594,12 @@ export default {
 
     renderChart(xData, series) {
       if (this.disposed || !this.chart) return;
-      // 按单位（℃/kPa/L/min）分组，为不同量纲分配独立 Y 轴，避免小数值曲线被压平
+      // 传感器按单位（℃/kPa/L/min）分组分配 Y 轴；执行器（0/1）独占一个右侧 Y 轴
       const unitIndex = {};
       const yAxes = [];
+      const hasActuator = series.some(s => s.isActuator);
       series.forEach(s => {
+        if (s.isActuator) return;
         const unit = s.unit || ''
         if (!(unit in unitIndex)) {
           const idx = yAxes.length;
@@ -649,6 +619,33 @@ export default {
         }
         s.yAxisIndex = unitIndex[unit];
       });
+
+      // 执行器 0/1 轴（排在传感器轴之后，右侧，标签为 关闭/开启）
+      if (hasActuator) {
+        const idx = yAxes.length;
+        yAxes.push({
+          type: 'value',
+          name: '开关',
+          min: -0.15,
+          max: 1.15,
+          interval: 1,
+          position: 'right',
+          offset: Math.floor(idx / 2) * 46,
+          nameTextStyle: { color: '#909399', fontSize: 10 },
+          axisLabel: {
+            color: '#909399',
+            fontSize: 10,
+            formatter: function (val) {
+              if (val === 0) return '关闭'
+              if (val === 1) return '开启'
+              return ''
+            }
+          },
+          axisLine: { show: true, lineStyle: { color: '#dcdfe6' } },
+          splitLine: { show: false }
+        });
+        series.forEach(s => { if (s.isActuator) s.yAxisIndex = idx; });
+      }
 
       // 无曲线时也保留一个默认 value 轴，避免 yAxis 为空导致 resize 触发 echarts 内部报错
       const finalYAxes = yAxes.length ? yAxes : [{
@@ -695,74 +692,6 @@ export default {
     resizeChart() {
       // 空数据/无曲线状态下 resize 可能触发 echarts 内部 getAxesOnZeroOf 报错，静默忽略
       if (this.chart) { try { this.chart.resize(); } catch (e) { /* 忽略 */ } }
-      if (this.actuatorChart) { try { this.actuatorChart.resize(); } catch (e) { /* 忽略 */ } }
-    },
-
-    // ===== 执行器状态曲线 =====
-    async fetchActuatorChartData() {
-      // 选「不显示执行器」时不请求、不渲染执行器曲线
-      if (this.filterData.actuatorType === 'none') return;
-      // 懒初始化：默认「不显示」时图表容器 v-if 隐藏，首次切换到显示后再初始化
-      if (!this.actuatorChart && this.$refs.actuatorChart) {
-        this.initActuatorChart();
-      }
-      const range = this.effectiveTimeRange();
-      const hasRange = range && range.length === 2;
-      const base = {
-        start_time: hasRange ? range[0] : undefined,
-        end_time: hasRange ? range[1] : undefined
-      };
-      try {
-        if (this.filterData.actuatorType === 'all') {
-          const cols = this.actuatorColumns;
-          const results = await Promise.all(
-            cols.map(col =>
-              this.$http.get('/records/sensor/chart', { params: { ...base, sensor_type: col.key } })
-            )
-          );
-          const points = results.map(r => this.normalizeChartPoints(r));
-          const series = cols.map((col, i) => this.buildActuatorSeries(col.key, points[i]));
-          const xData = this.pickXData(points);
-          this.renderActuatorChart(xData, series);
-        } else {
-          const res = await this.$http.get('/records/sensor/chart', {
-            params: { ...base, sensor_type: this.filterData.actuatorType }
-          });
-          const points = this.normalizeChartPoints(res);
-          const series = [this.buildActuatorSeries(this.filterData.actuatorType, points)];
-          const xData = points.map(d => d.timestamp);
-          this.renderActuatorChart(xData, series);
-        }
-      } catch (error) {
-        this.$message.error('获取执行器曲线失败');
-        this.renderActuatorChart([], []);
-      }
-    },
-
-    // 执行器曲线：数据已是 0/1，用阶梯线展示开/关状态，不显示圆点
-    buildActuatorSeries(key, data) {
-      const col = this.actuatorColumns.find(c => c.key === key)
-      const color = actuatorColor(key)
-      const name = col ? col.label : actuatorLabel(key)
-      return {
-        name,
-        type: 'line',
-        data: (Array.isArray(data) ? data : []).map(d => d.value),
-        step: 'start',           // 阶梯线：变更后保持原值直到下一个点
-        symbol: 'none',          // 不显示数据点圆点
-        showSymbol: false,
-        lineStyle: { color, width: 2 },
-        itemStyle: { color }
-      };
-    },
-
-    renderActuatorChart(xData, series) {
-      if (this.disposed || !this.actuatorChart) return;
-      this.actuatorChart.setOption({
-        legend: { data: series.map(s => s.name) },
-        xAxis: { data: xData },
-        series: series
-      }, { replaceMerge: ['series'] });
     },
 
     formatDate(date) {
